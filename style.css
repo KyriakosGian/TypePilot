@@ -1,0 +1,245 @@
+/**
+ * style.css - TypePilot AI Content Script Styles
+ *
+ * Scoped styles for all injected UI elements:
+ *   - #typepilot-btn  : floating trigger button
+ *   - #typepilot-popup: alternatives & error popup
+ *
+ * Uses a CSS custom-property design token system so the UI can be easily
+ * re-themed without touching individual rules.
+ */
+
+/* ==========================================================================
+   Design tokens
+   ========================================================================== */
+:root {
+  --lf-accent:        #6c63ff;
+  --lf-accent-hover:  #574fd6;
+  --lf-accent-glow:   rgba(108, 99, 255, 0.35);
+  --lf-bg:            #1e1e2e;
+  --lf-bg-card:       #2a2a3e;
+  --lf-bg-item:       #32324a;
+  --lf-bg-item-hover: #3d3d5c;
+  --lf-border:        rgba(255, 255, 255, 0.08);
+  --lf-text:          #e2e2f0;
+  --lf-text-muted:    #9090a8;
+  --lf-success:       #4ade80;
+  --lf-error:         #f87171;
+  --lf-radius:        12px;
+  --lf-radius-sm:     8px;
+  --lf-shadow:        0 8px 32px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255,255,255,0.06);
+  --lf-font:          "Inter", "Segoe UI", system-ui, sans-serif;
+  --lf-z:             2147483647; /* Max z-index to always float on top */
+}
+
+/* ==========================================================================
+   Floating trigger button
+   ========================================================================== */
+.typepilot-btn {
+  all: unset; /* Reset host-page styles */
+  position: absolute;
+  z-index: var(--lf-z);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 6px 8px;
+  background: var(--lf-accent);
+  color: #fff;
+  font-family: var(--lf-font);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-radius: 20px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px var(--lf-accent-glow), 0 2px 4px rgba(0,0,0,0.4);
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+  animation: typepilot-pop-in 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.typepilot-btn:hover {
+  background: var(--lf-accent-hover);
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 6px 20px var(--lf-accent-glow), 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.typepilot-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.typepilot-btn--loading {
+  background: var(--lf-accent-hover);
+  cursor: wait;
+  pointer-events: none;
+}
+
+/* Icon inside the button */
+.typepilot-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* Spinner dots */
+.typepilot-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: typepilot-spin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Alternatives / Error popup
+   ========================================================================== */
+.typepilot-popup {
+  all: unset;
+  display: block;
+  position: absolute;
+  z-index: var(--lf-z);
+  width: 320px;
+  background: var(--lf-bg-card);
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius);
+  box-shadow: var(--lf-shadow);
+  font-family: var(--lf-font);
+  color: var(--lf-text);
+  overflow: hidden;
+  animation: typepilot-pop-in 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Header bar */
+.typepilot-popup__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--lf-bg);
+  border-bottom: 1px solid var(--lf-border);
+}
+
+.typepilot-popup__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--lf-text);
+}
+
+.typepilot-popup__title svg {
+  width: 14px;
+  height: 14px;
+  color: var(--lf-accent);
+}
+
+.typepilot-popup__close {
+  all: unset;
+  cursor: pointer;
+  color: var(--lf-text-muted);
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.typepilot-popup__close:hover {
+  color: var(--lf-text);
+  background: rgba(255,255,255,0.07);
+}
+
+/* Alternatives list */
+.typepilot-popup__list {
+  all: unset;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px;
+}
+
+.typepilot-popup__item {
+  all: unset;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-radius: var(--lf-radius-sm);
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.typepilot-popup__item:last-child {
+  margin-bottom: 0;
+}
+
+.typepilot-popup__item-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lf-text-muted);
+  padding: 4px 10px 0;
+}
+
+.typepilot-popup__item-text {
+  all: unset;
+  display: block;
+  width: 100%;
+  padding: 8px 10px 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--lf-text);
+  background: var(--lf-bg-item);
+  border-radius: var(--lf-radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  word-break: break-word;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.typepilot-popup__item-text:hover {
+  background: var(--lf-bg-item-hover);
+  color: #fff;
+}
+
+/* Error state */
+.typepilot-popup--error .typepilot-popup__header {
+  background: rgba(248, 113, 113, 0.12);
+  border-bottom-color: rgba(248, 113, 113, 0.2);
+}
+
+.typepilot-popup--error .typepilot-popup__title {
+  color: var(--lf-error);
+}
+
+.typepilot-popup__error-msg {
+  all: unset;
+  display: block;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--lf-text);
+}
+
+/* ==========================================================================
+   Keyframe animations
+   ========================================================================== */
+@keyframes typepilot-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.88) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes typepilot-spin {
+  to { transform: rotate(360deg); }
+}

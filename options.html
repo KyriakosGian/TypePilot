@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TypePilot — Settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="options.css" />
+</head>
+
+<body>
+
+  <div class="app">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar__brand">
+        <img src="icons/icon.png" class="sidebar__logo" alt="TypePilot icon" />
+        <div>
+          <h1
+            style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em;">
+            TypePilot</h1>
+          <p class="sidebar__tagline">AI Writing Assistant</p>
+        </div>
+      </div>
+
+      <nav class="sidebar__nav">
+        <a href="#api-section" class="sidebar__nav-link sidebar__nav-link--active">API Configuration</a>
+        <a href="#model-section" class="sidebar__nav-link" id="nav-model">AI Model</a>
+        <a href="#prompt-section" class="sidebar__nav-link">Correction Prompt</a>
+      </nav>
+
+      <div class="sidebar__footer" style="margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 11px; color: var(--text-muted); line-height: 1.6;">
+          Created by <a href="https://github.com/KyriakosGian" target="_blank"
+            style="color: var(--text-primary); font-weight: 600; text-decoration: none;">KyriakosGian</a><br>
+          <a href="https://miniapps.gr/TypePilotAi" target="_blank"
+            style="color: inherit; text-decoration: none; display: block; margin-top: 4px;">miniapps.gr/TypePilotAi</a>
+          <a href="https://ProCreta.gr" target="_blank" style="color: inherit; text-decoration: none;">ProCreta.gr</a>
+        </div>
+        <div class="sidebar__version" style="margin-top: 4px;">v1.0.0</div>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main">
+      <div class="content">
+
+        <div class="page-header">
+          <h2 class="page-header__title">Settings</h2>
+          <p class="page-header__subtitle">Configure how TypePilot connects to the AI backend.</p>
+        </div>
+
+        <form id="settingsForm" novalidate>
+
+          <!-- ===== API Configuration ===== -->
+          <section id="api-section" class="card">
+            <div class="card__icon-wrap card__icon-wrap--purple">
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  d="M9 12.5A3.5 3.5 0 1 1 12.5 9 3.5 3.5 0 0 1 9 12.5zM9 7a2.5 2.5 0 1 0 2.5 2.5A2.5 2.5 0 0 0 9 7zM3 9a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1A.5.5 0 0 1 3 9zm11 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1A.5.5 0 0 1 14 9zM9 3a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0v-1A.5.5 0 0 1 9 3zm0 11a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0v-1A.5.5 0 0 1 9 14z" />
+              </svg>
+            </div>
+            <div class="card__body">
+              <h3 class="card__title">Google Gemini API Key</h3>
+              <p class="card__description">TypePilot uses Google's AI models directly. You need a free API key to use
+                the extension.</p>
+
+              <!-- API Key input -->
+              <div class="field-group" id="api-key-group">
+                <label class="field-label" for="geminiApiKey">
+                  API Key
+                  <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer"
+                    class="field-label__link">Get a free key ↗</a>
+                </label>
+                <div class="field-input-wrap">
+                  <input type="password" id="geminiApiKey" name="geminiApiKey" class="field-input" placeholder="AIza…"
+                    autocomplete="off" spellcheck="false" />
+                  <button type="button" id="toggleKeyVisibility" class="field-eye-btn"
+                    aria-label="Toggle key visibility">
+                    <svg id="eye-icon-show" viewBox="0 0 20 20" fill="currentColor">
+                      <path
+                        d="M10 3C5 3 1.73 7.11 1.07 9.82a1 1 0 0 0 0 .36C1.73 12.89 5 17 10 17s8.27-4.11 8.93-6.82a1 1 0 0 0 0-.36C18.27 7.11 15 3 10 3zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
+                    </svg>
+                    <svg id="eye-icon-hide" viewBox="0 0 20 20" fill="currentColor" style="display:none">
+                      <path
+                        d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.74-1.74A10.08 10.08 0 0 0 18.94 10a10.08 10.08 0 0 0-9-6.27L3.28 2.22zM10 5a5 5 0 0 1 3.54 8.54L5.46 5.46A4.98 4.98 0 0 1 10 5zM1.06 10a10.08 10.08 0 0 0 8 5.83l-6.76-6.76A10.1 10.1 0 0 0 1.06 10z" />
+                    </svg>
+                  </button>
+                </div>
+                <p class="field-hint" id="keyStatusHint">Stored locally on this device and never shared. Models load
+                  automatically when a valid key is detected.</p>
+              </div>
+
+            </div>
+          </section>
+
+          <!-- ===== AI Model ===== -->
+          <section id="model-section" class="card">
+            <div class="card__icon-wrap card__icon-wrap--blue">
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  d="M10 2a8 8 0 1 0 0 16A8 8 0 0 0 10 2zm0 14a6 6 0 1 1 0-12 6 6 0 0 1 0 12zm-1-9v4l3 2-1 1.5-3.5-2.5V7h1.5z" />
+              </svg>
+            </div>
+            <div class="card__body">
+              <h3 class="card__title">AI Model</h3>
+              <p class="card__description">Select which Gemini model to use. The list loads automatically from your API
+                key.</p>
+
+              <div class="field-group">
+                <label class="field-label" for="geminiModel">Model</label>
+
+                <select id="geminiModel" name="geminiModel" class="field-select">
+                  <!-- Populated dynamically via JS -->
+                  <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                </select>
+
+                <p class="field-hint" id="fetchModelsHint">
+                  Enter your API key above — available models will load automatically.
+                </p>
+
+                <div class="field-info-box"
+                  style="margin-top: 1rem; font-size: 13px; color: var(--text-secondary); background: rgba(108, 99, 255, 0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(108, 99, 255, 0.1);">
+                  <strong>💡 Free Tier Tip:</strong> Google imposes different Rate Limits (RPM) depending on the model.
+                  For extensions, models like <strong>Gemini 2.5 Flash Lite</strong> (10-15 requests/min) are highly
+                  recommended. Standard Flash models have stricter limits (e.g. 5 req/min), while Pro models may have
+                  none in free tier.
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== Correction Prompt ===== -->
+          <section id="prompt-section" class="card">
+            <div class="card__icon-wrap card__icon-wrap--blue">
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  d="M4 3a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H4zm1 2h10v10H5V5zm2 2v2h2V7H7zm4 0v2h2V7h-2zm-4 4v2h6v-2H7z" />
+              </svg>
+            </div>
+            <div class="card__body">
+              <h3 class="card__title">Correction Prompt</h3>
+              <p class="card__description">System instructions sent to the AI on every request.</p>
+
+              <div class="field-group">
+                <div class="field-label-row">
+                  <label class="field-label" for="systemPrompt">System Instructions</label>
+                  <button type="button" id="resetPrompt" class="btn-text">Reset to default</button>
+                </div>
+                <textarea id="systemPrompt" name="systemPrompt" class="field-textarea" rows="6"
+                  spellcheck="false"></textarea>
+                <p class="field-hint">Output must always be a JSON array
+                  <code>["corrected", "alt1", "english translation"]</code>.</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== Action Bar ===== -->
+          <div class="action-bar">
+            <div id="statusMessage" class="status-message" role="alert" aria-live="polite"></div>
+            <button type="submit" id="saveBtn" class="btn-primary">
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path d="M5 4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V8.41l-4-4H5zm6 0v4h4M8 15v-4h4v4" />
+              </svg>
+              Save Settings
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </main>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+
+</html>
