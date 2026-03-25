@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="images/logo.png" width="280" alt="TypePilot Logo"/>
+  <img src="./images/logo.png" width="280" alt="TypePilot Logo"/>
   <h1>TypePilot - AI Writing Assistant</h1>
 </div>
 
@@ -25,8 +25,8 @@ Since this extension is an open-source project, you can easily install it locall
 ## ⚙️ Configuration
 
 <div align="center">
-  <img src="images/settings-ss1.png" width="400" alt="Settings Page" style="margin-right: 10px;" />
-  <img src="images/settings-ss2.png" width="400" alt="Settings Page" />
+  <img src="./images/settings-ss1.png" width="400" alt="Settings Page" style="margin-right: 10px;" />
+  <img src="./images/settings-ss2.png" width="400" alt="Settings Page" />
 </div>
 <br>
 
@@ -39,14 +39,14 @@ Since this extension is an open-source project, you can easily install it locall
 
 ## 💡 How to Use
 1. Type some text into any input field, text area, or social media composer (e.g. Twitter/X, Facebook, Gmail, etc).
+   <br><img src="./images/Live1.png" width="500" alt="Step 1: Type Text" />
 2. **Highlight** the text you want to improve.
 3. A small floating **TypePilot popup** will appear.
-   <br><img src="images/Live1.png" width="500" alt="Step 1: Type Text" />
 4. Click **Fix** and wait a moment.
 5. A dropdown with the corrected text and alternatives will appear. 
-   <br><img src="images/Live2.png" width="500" alt="Step 2: Highlight and Click Fix" />
+   <br><img src="./images/Live2.png" width="500" alt="Step 2: Highlight and Click Fix" />
 6. Click your preferred option, and your text will be instantly replaced!
-   <br><img src="images/Live3.png" width="500" alt="Step 3: Choose an Alternative" />
+   <br><img src="./images/Live3.png" width="500" alt="Step 3: Choose an Alternative" />
 
 ## 🔐 Privacy & Security
 TypePilot communicates **directly** between your browser and the Google Gemini API. Your API key is stored securely using `chrome.storage.local` within your browser and is **never** sent to any third-party server. All data stays between you and Google.
