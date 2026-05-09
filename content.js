@@ -219,7 +219,7 @@ document.addEventListener("keydown", (event) => {
 // Fix button click handler
 // ---------------------------------------------------------------------------
 
-async function handleFixButtonClick() {
+async function handleFixButtonClick(explicitAnchor) {
   // Resolve selected text from the correct mode.
   let selectedText = "";
 
@@ -231,16 +231,31 @@ async function handleFixButtonClick() {
 
   if (!selectedText.trim()) { removeAllUI(); return; }
 
-  const btnRect = floatingBtn.getBoundingClientRect();
-  const anchorX = btnRect.left;
-  const anchorY = btnRect.bottom;
+  // Anchor for the result/error popup. Prefer explicit (used by retry) over
+  // the floating button's current rect.
+  let anchorX, anchorY;
+  if (explicitAnchor) {
+    anchorX = explicitAnchor.x;
+    anchorY = explicitAnchor.y;
+  } else if (floatingBtn) {
+    const btnRect = floatingBtn.getBoundingClientRect();
+    anchorX = btnRect.left;
+    anchorY = btnRect.bottom;
+  } else {
+    // No anchor available — bail silently rather than throwing.
+    return;
+  }
 
-  setButtonLoading();
+  if (floatingBtn) setButtonLoading();
 
   // Guard: check that the extension context is still valid before messaging.
   // This catches the case where the extension was reloaded while the tab was open.
   if (!chrome.runtime?.id) {
-    showErrorPopup("⟳ TypePilot was updated. Please reload this page to continue.", anchorX, anchorY);
+    showErrorPopup({
+      code:      "CONTEXT_INVALIDATED",
+      message:   "TypePilot was updated. Reload this page (F5) to continue.",
+      retriable: false,
+    }, anchorX, anchorY, selectedText);
     return;
   }
 
@@ -253,18 +268,26 @@ async function handleFixButtonClick() {
     if (response?.success && Array.isArray(response.alternatives)) {
       showPopup(response.alternatives, anchorX, anchorY);
     } else {
-      showErrorPopup(response?.error ?? "Unknown error", anchorX, anchorY);
+      showErrorPopup({
+        code:      response?.code      ?? "UNKNOWN",
+        message:   response?.error     ?? "Unknown error.",
+        retriable: response?.retriable ?? false,
+      }, anchorX, anchorY, selectedText);
     }
   } catch (err) {
     console.error("[TypePilot] Message error:", err);
 
     // "Extension context invalidated" → stale content script after extension reload.
-    if (err.message?.includes("Extension context invalidated") || err.message?.includes("context invalidated")) {
-      showErrorPopup("⟳ TypePilot was updated. Please reload this page (F5) to continue.", anchorX, anchorY);
-    } else {
-      showErrorPopup(err.message, anchorX, anchorY);
-    }
-    removeFloatingBtn();
+    const isContextErr = err.message?.includes("Extension context invalidated")
+                      || err.message?.includes("context invalidated");
+
+    showErrorPopup({
+      code:      isContextErr ? "CONTEXT_INVALIDATED" : "MESSAGING_ERROR",
+      message:   isContextErr
+        ? "TypePilot was updated. Reload this page (F5) to continue."
+        : (err.message || "Could not reach the background service worker."),
+      retriable: !isContextErr,
+    }, anchorX, anchorY, selectedText);
   }
 }
 
@@ -400,23 +423,99 @@ function showPopup(alternatives, x, y) {
 // Error popup
 // ---------------------------------------------------------------------------
 
-function showErrorPopup(message, x, y) {
+/**
+ * Render an error popup using safe DOM construction (no innerHTML interpolation).
+ *
+ * @param {{code: string, message: string, retriable: boolean}} error
+ * @param {number} x        - Anchor X (viewport).
+ * @param {number} y        - Anchor Y (viewport).
+ * @param {string} [retryText] - If provided + error.retriable, shows a Try Again button.
+ */
+function showErrorPopup(error, x, y, retryText) {
   removePopup();
   removeFloatingBtn();
+
+  const { code = "UNKNOWN", message = "Unknown error.", retriable = false } = error || {};
 
   popup = document.createElement("div");
   popup.id = "typepilot-popup";
   popup.className = "typepilot-popup typepilot-popup--error";
-  popup.innerHTML = `
-    <div class="typepilot-popup__header">
-      <span class="typepilot-popup__title">⚠ TypePilot Error</span>
-      <button class="typepilot-popup__close" aria-label="Close">✕</button>
-    </div>
-    <p class="typepilot-popup__error-msg">${message}</p>
-  `;
+  popup.setAttribute("role", "alert");
 
+  // ── Header ────────────────────────────────────────────────────────────────
+  const header = document.createElement("div");
+  header.className = "typepilot-popup__header";
+
+  const title = document.createElement("span");
+  title.className = "typepilot-popup__title";
+  title.textContent = "⚠ TypePilot Error";
+  header.appendChild(title);
+
+  const codeBadge = document.createElement("span");
+  codeBadge.className   = "typepilot-popup__code";
+  codeBadge.textContent = code;
+  codeBadge.title       = "Error code (for support / debugging)";
+  header.appendChild(codeBadge);
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "typepilot-popup__close";
+  closeBtn.setAttribute("aria-label", "Close");
+  closeBtn.textContent = "✕";
+  closeBtn.addEventListener("click", removeAllUI);
+  header.appendChild(closeBtn);
+
+  popup.appendChild(header);
+
+  // ── Message body (textContent → safe from XSS) ────────────────────────────
+  const msg = document.createElement("p");
+  msg.className   = "typepilot-popup__error-msg";
+  msg.textContent = message;
+  popup.appendChild(msg);
+
+  // ── Action row ────────────────────────────────────────────────────────────
+  const actions = document.createElement("div");
+  actions.className = "typepilot-popup__actions";
+
+  if (retriable && retryText) {
+    const retryBtn = document.createElement("button");
+    retryBtn.className   = "typepilot-popup__btn typepilot-popup__btn--primary";
+    retryBtn.textContent = "Try Again";
+    retryBtn.addEventListener("click", () => {
+      removePopup();
+      // Re-run with the same anchor coords (no need to recreate the floating button).
+      handleFixButtonClick({ x, y });
+    });
+    actions.appendChild(retryBtn);
+  }
+
+  // "Open Settings" shortcut for key/quota related errors.
+  if (code === "NO_KEY" || code === "INVALID_KEY" || code === "MODEL_NOT_FOUND" || code === "QUOTA_EXCEEDED") {
+    const settingsBtn = document.createElement("button");
+    settingsBtn.className   = "typepilot-popup__btn";
+    settingsBtn.textContent = "Open Settings";
+    settingsBtn.addEventListener("click", () => {
+      try {
+        chrome.runtime.sendMessage({ type: "TYPEPILOT_OPEN_SETTINGS" });
+      } catch { /* context invalidated — ignore */ }
+      removeAllUI();
+    });
+    actions.appendChild(settingsBtn);
+  }
+
+  if (actions.children.length > 0) {
+    popup.appendChild(actions);
+  }
+
+  // ── Position ──────────────────────────────────────────────────────────────
   popup.style.left = `${x + window.scrollX}px`;
   popup.style.top  = `${y + window.scrollY + 8}px`;
   document.body.appendChild(popup);
-  popup.querySelector(".typepilot-popup__close").addEventListener("click", removeAllUI);
+
+  // Overflow guard.
+  requestAnimationFrame(() => {
+    const rect = popup.getBoundingClientRect();
+    const margin = 8;
+    if (rect.right  > window.innerWidth  - margin) popup.style.left = `${window.innerWidth  - rect.width  - margin + window.scrollX}px`;
+    if (rect.bottom > window.innerHeight - margin) popup.style.top  = `${y + window.scrollY - rect.height - margin}px`;
+  });
 }
