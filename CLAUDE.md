@@ -1,64 +1,86 @@
-# TypePilot - Technical Specifications & Guidelines
+# CLAUDE.md
 
-## 1. Project Overview
-TypePilot is a Chrome Extension (Manifest V3) acting as an AI Writing Assistant using the Google Gemini API. It follows a **BYOK (Bring Your Own Key)** model, communicating directly with Google's endpoints from the client-side.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 2. Core Architecture
-- **Manifest V3**: Uses a Service Worker (`background.js`) and Content Scripts (`content.js`).
-- **Permissions**: `storage`, `activeTab`, `scripting`, `tabs`, and host permissions for `https://generativelanguage.googleapis.com/*`.
-- **Storage**: All settings (API Key, Model, System Prompt) are stored in `chrome.storage.local`.
+## Project Overview
 
-## 3. Key Component Responsibilities
-### Content Script (`content.js`)
-- **Selection Detection**: Monitors `mouseup` and `focusin` events.
-- **Field Support**: Handles Native inputs (`textarea`, `input`) and `contenteditable` elements (Gmail, Notion, etc.).
-- **UI Injection**: Injects a floating "Fix" button and an alternatives popup directly into the DOM.
-- **Context Guard**: Includes checks for `chrome.runtime.id` to handle extension invalidation after updates.
+TypePilot is a Chrome Extension (Manifest V3) — a real-time AI writing assistant powered by the Google Gemini API using a Bring Your Own Key (BYOK) model. Users supply a free API key from Google AI Studio; the extension communicates directly with Google's servers with no intermediate backend.
 
-### Service Worker (`background.js`)
-- **API Proxy**: Orchestrates direct calls to the Gemini `generateContent` endpoint.
-- **Response Parsing**: Implements a defensive parser for the AI's raw text, stripping markdown fences to extract a clean JSON array.
-- **Default Model**: `gemini-2.5-flash-lite` (Recommended for higher RPM in free tier).
+## Development
 
-### Settings (`options.js` / `options.html`)
-- **Dynamic Model Fetching**: Uses the `ListModels` API to fetch available models based on the provided API Key.
-- **Debouncing**: Implements a 900ms debounce on API Key input before fetching models.
-- **Fallback Logic**: Provides local fallback models if API fetching fails.
+**No build process.** Load the extension directory directly as an unpacked extension in Chrome (`chrome://extensions` → "Load unpacked"). Changes to any file take effect after clicking "Reload" on the extensions page.
 
-## 4. Technical Constraints & Data Schemas
-### System Prompt Requirement
-The AI must strictly output a JSON array of 3 strings:
-`["Corrected text", "Alternative 1", "English Translation"]`
+There are no dependencies, npm packages, build steps, or test suite. All files are plain JavaScript (ES modules in `background.js`, classic scripts elsewhere).
 
-### API Implementation
-- **Endpoint**: `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}`
-- **Payload Structure**:
-  ```json
-  {
-    "system_instruction": { "parts": [{ "text": systemPrompt }] },
-    "contents": [{ "role": "user", "parts": [{ "text": userInput }] }],
-    "generationConfig": { "temperature": 0.7, "maxOutputTokens": 1024 }
-  }
+## Architecture
 
-## 5. UI Design System
-Colors: Dark-themed (#0f0f1a background, #6c63ff accent).
+### File Roles
 
-Styling: Scoped CSS using custom properties (tokens) starting with --lf- for content scripts and standard variables for options.
+| File | Role |
+|---|---|
+| `manifest.json` | Extension config — permissions (`storage`, `activeTab`, `scripting`, `tabs`), host permissions for `generativelanguage.googleapis.com` |
+| `background.js` | Service Worker — owns all Gemini API calls, error mapping, response parsing |
+| `content.js` | Content Script — selection detection, floating UI injection, text replacement |
+| `style.css` | Scoped styles for content script UI (button + popups) |
+| `options.html/js/css` | Settings page — API key input, live model picker, system prompt editor |
 
-Z-Index: Uses 2147483647 for injected UI to ensure top-level visibility.
+### Message Flow
 
-## 6. Current Development Status
-Version: 1.0.0
+```
+User selects text → content.js detects via mouseup
+    → floating "Fix" button appears
+    → user clicks → chrome.runtime.sendMessage({ type: "TYPEPILOT_PROCESS", text })
+    → background.js reads chrome.storage.local (key, model, prompt)
+    → POST to generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
+    → response parsed into string[3]
+    → { success: true, alternatives: [...] } sent back
+    → content.js renders popup; user clicks alternative → text replaced
+```
 
-Stability: Production-ready code with error handling for API 429 (Rate Limits) and context invalidation.
+### Two Selection Modes in content.js
 
-Next Steps: Dogfooding phase followed by Chrome Web Store submission.
+- **Native mode** (`<textarea>`, `<input>`): uses `selectionStart`/`selectionEnd`/`.value`
+- **Contenteditable mode** (Gmail, Notion, Google Docs): uses `window.getSelection()` + `Range`; range is cloned immediately to survive DOM mutations
 
-## 7. Instructions for AI Assistant (Claude/Others)
-Maintain the BYOK philosophy (no external backend proxies).
+### Gemini API Contract
 
-Ensure all DOM manipulations in content.js remain non-intrusive.
+The system prompt instructs the model to return **exactly** a JSON array of 3 strings:
+```json
+["Corrected text", "Alternative 1", "English Translation"]
+```
 
-Keep the gemini-2.5-flash-lite as the primary fallback model.
+Payload structure:
+```json
+{
+  "system_instruction": { "parts": [{ "text": "<systemPrompt>" }] },
+  "contents": [{ "role": "user", "parts": [{ "text": "<selectedText>" }] }],
+  "generationConfig": { "temperature": 0.7, "maxOutputTokens": 1024 }
+}
+```
 
-Strictly adhere to the Manifest V3 security guidelines (no unsafe-eval).
+`parseAlternatives()` in `background.js` handles markdown fences and prose-wrapped arrays defensively.
+
+### Error Codes
+
+`background.js` maps all failures to stable codes: `NO_TEXT`, `NO_KEY`, `INVALID_KEY`, `RATE_LIMIT`, `QUOTA_EXCEEDED`, `MODEL_NOT_FOUND`, `SAFETY_BLOCK`, `EMPTY_RESPONSE`, `PARSE_ERROR`, `TIMEOUT`, `NETWORK_ERROR`, `SERVER_ERROR`, `HTTP_ERROR`, `UNKNOWN`. The `retriable` boolean on each error drives the "Try Again" button in content.js.
+
+### chrome.storage.local Keys
+
+- `geminiApiKey` — user's Google API key
+- `geminiModel` — selected model ID (default: `gemini-2.5-flash-lite`)
+- `systemPrompt` — full system instruction string
+
+### UI Design System
+
+- **Colors:** Dark-themed (`#0f0f1a` background, `#6c63ff` accent)
+- **Z-Index:** `2147483647` for injected UI to float above all page content
+- **CSS Scoping:** All custom properties prefixed `--lf-` to avoid conflicts with host pages
+- **XSS prevention:** Error messages use `textContent` (never `innerHTML`)
+
+## Instructions for AI Assistants
+
+- Maintain the BYOK philosophy — no external backend proxies, direct browser → Google API only.
+- Ensure all DOM manipulations in `content.js` remain non-intrusive to host pages.
+- Keep `gemini-2.5-flash-lite` as the primary fallback model (higher RPM on free tier).
+- Strictly adhere to Manifest V3 security guidelines (no `unsafe-eval`).
+- Content script must guard every `chrome.runtime.*` call against extension context invalidation.
