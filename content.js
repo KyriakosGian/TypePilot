@@ -352,6 +352,44 @@ function replaceSelectedText(replacement) {
 }
 
 // ---------------------------------------------------------------------------
+// Popup positioning helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Clamp a popup element fully inside the viewport.
+ * Tries to flip above the anchor if overflowing the bottom.
+ * Falls back to clamping all four edges so the popup is always visible.
+ * @param {HTMLElement} el
+ * @param {number} anchorY - Viewport Y of the anchor point (used for flipping).
+ */
+function clampPopupToViewport(el, anchorY) {
+  const rect   = el.getBoundingClientRect();
+  const margin = 8;
+
+  // ── Horizontal ──────────────────────────────────────────────────────────
+  let vLeft = parseFloat(el.style.left) - window.scrollX;
+  if (vLeft + rect.width > window.innerWidth - margin) {
+    vLeft = window.innerWidth - rect.width - margin;
+  }
+  if (vLeft < margin) vLeft = margin;
+  el.style.left = `${vLeft + window.scrollX}px`;
+
+  // ── Vertical ────────────────────────────────────────────────────────────
+  let vTop = parseFloat(el.style.top) - window.scrollY;
+  // Overflows bottom → try flipping above the anchor
+  if (vTop + rect.height > window.innerHeight - margin) {
+    vTop = anchorY - rect.height - margin;
+  }
+  // Clamp top edge (handles flip going above viewport or tiny viewports)
+  if (vTop < margin) vTop = margin;
+  // Final clamp bottom (last resort when popup taller than viewport)
+  if (vTop + rect.height > window.innerHeight - margin) {
+    vTop = Math.max(margin, window.innerHeight - rect.height - margin);
+  }
+  el.style.top = `${vTop + window.scrollY}px`;
+}
+
+// ---------------------------------------------------------------------------
 // Alternatives popup
 // ---------------------------------------------------------------------------
 
@@ -409,12 +447,7 @@ function showPopup(alternatives, x, y) {
   popup.style.top  = `${y + window.scrollY + margin}px`;
   document.body.appendChild(popup);
 
-  // Overflow guard.
-  requestAnimationFrame(() => {
-    const rect = popup.getBoundingClientRect();
-    if (rect.right  > window.innerWidth  - margin) popup.style.left = `${window.innerWidth  - rect.width  - margin + window.scrollX}px`;
-    if (rect.bottom > window.innerHeight - margin) popup.style.top  = `${y + window.scrollY - rect.height - margin}px`;
-  });
+  requestAnimationFrame(() => clampPopupToViewport(popup, y));
 
   header.querySelector(".typepilot-popup__close").addEventListener("click", removeAllUI);
 }
@@ -511,11 +544,5 @@ function showErrorPopup(error, x, y, retryText) {
   popup.style.top  = `${y + window.scrollY + 8}px`;
   document.body.appendChild(popup);
 
-  // Overflow guard.
-  requestAnimationFrame(() => {
-    const rect = popup.getBoundingClientRect();
-    const margin = 8;
-    if (rect.right  > window.innerWidth  - margin) popup.style.left = `${window.innerWidth  - rect.width  - margin + window.scrollX}px`;
-    if (rect.bottom > window.innerHeight - margin) popup.style.top  = `${y + window.scrollY - rect.height - margin}px`;
-  });
+  requestAnimationFrame(() => clampPopupToViewport(popup, y));
 }
