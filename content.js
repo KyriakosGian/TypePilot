@@ -98,7 +98,8 @@ function isEditableField(el) {
 // ---------------------------------------------------------------------------
 
 document.addEventListener("focusin", (event) => {
-  const el = event.target;
+  // composedPath()[0] is the actual focused element even through shadow DOM boundaries.
+  const el = (event.composedPath?.() ?? [])[0] ?? event.target;
   const ceRoot = getContentEditableRoot(el);
 
   if (ceRoot) {
@@ -153,26 +154,27 @@ function setButtonLoading() {
 // ---------------------------------------------------------------------------
 
 document.addEventListener("mouseup", (event) => {
-  // Ignore clicks on our own UI.
-  if (event.target.closest("#typepilot-btn, #typepilot-popup")) return;
+  // Capture composedPath synchronously — it may be emptied after event dispatch.
+  // This also handles shadow DOM: event.target is retargeted to the shadow host,
+  // but composedPath() contains the real inner element.
+  const composedPath = event.composedPath?.() ?? [];
+
+  // Ignore clicks on our own UI (check path, not just retargeted target).
+  if (composedPath.some(n => n?.id === "typepilot-btn" || n?.id === "typepilot-popup")) return;
+
+  // For native fields inside shadow DOM, window.getSelection() won't track
+  // textarea selections. Check path membership here, before the timeout clears it.
+  const wasInActiveNative =
+    activeMode === "native" &&
+    activeElement &&
+    isNativeField(activeElement) &&
+    composedPath.includes(activeElement);
 
   setTimeout(() => {
     let selectedText = "";
 
-    // Check if the selection is inside an editable element (textarea, input, contenteditable).
-    const sel = window.getSelection();
-    let targetEl = sel?.anchorNode;
-    if (targetEl && targetEl.nodeType !== Node.ELEMENT_NODE) {
-      targetEl = targetEl.parentElement;
-    }
-
-    if (!targetEl || !isEditableField(targetEl)) {
-      removeAllUI();
-      return;
-    }
-
-    if (activeMode === "native" && activeElement && isNativeField(activeElement)) {
-      // ── Native textarea / input ──────────────────────────────────────────
+    if (wasInActiveNative) {
+      // ── Native textarea / input (incl. inside shadow DOM) ────────────────
       const start = activeElement.selectionStart;
       const end   = activeElement.selectionEnd;
       selectedText = activeElement.value.slice(start, end).trim();
@@ -187,6 +189,16 @@ document.addEventListener("mouseup", (event) => {
     } else {
       // ── Contenteditable (Gmail, Notion, Google Docs, etc.) ───────────────
       const sel = window.getSelection();
+      let targetEl = sel?.anchorNode;
+      if (targetEl && targetEl.nodeType !== Node.ELEMENT_NODE) {
+        targetEl = targetEl.parentElement;
+      }
+
+      if (!targetEl || !isEditableField(targetEl)) {
+        removeAllUI();
+        return;
+      }
+
       if (sel && sel.rangeCount > 0) {
         selectedText = sel.toString().trim();
       }
