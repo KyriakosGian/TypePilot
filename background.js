@@ -289,7 +289,7 @@ async function callGeminiDirect(text, systemPrompt, apiKey, model) {
   const payload = {
     system_instruction: { parts: [{ text: systemPrompt }] },
     contents: [{ role: "user", parts: [{ text }] }],
-    generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+    generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
   };
 
   const controller = new AbortController();
