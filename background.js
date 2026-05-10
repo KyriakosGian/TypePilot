@@ -250,10 +250,18 @@ function extractTextOrThrow(data) {
 
   const rawText = candidate?.content?.parts?.[0]?.text ?? "";
 
-  if (finishReason === "MAX_TOKENS" && !rawText) {
+  if (finishReason === "MAX_TOKENS") {
+    if (!rawText) {
+      throw new TypePilotError(
+        ERR.EMPTY_RESPONSE,
+        "Response was cut off before any text was produced. Try a shorter selection.",
+        false,
+      );
+    }
+    // Partial text exists but the JSON will be truncated — surface a clear error.
     throw new TypePilotError(
-      ERR.EMPTY_RESPONSE,
-      "Response was cut off before any text was produced. Try a shorter selection.",
+      ERR.PARSE_ERROR,
+      "The selected text is too long for the model to process in one go. Try selecting a shorter passage.",
       false,
     );
   }
