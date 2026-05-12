@@ -89,9 +89,14 @@ document.addEventListener("DOMContentLoaded", async () => {
  * @param {string} selectedId
  */
 function populateModelSelect(models, selectedId) {
-  geminiModelSelect.innerHTML = models
-    .map((m) => `<option value="${m.id}"${m.id === selectedId ? " selected" : ""}>${m.name}</option>`)
-    .join("");
+  geminiModelSelect.innerHTML = "";
+  for (const m of models) {
+    const opt = document.createElement("option");
+    opt.value = m.id;
+    opt.textContent = m.name;
+    opt.selected = m.id === selectedId;
+    geminiModelSelect.appendChild(opt);
+  }
 }
 
 /**

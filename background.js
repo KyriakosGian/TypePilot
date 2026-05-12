@@ -353,7 +353,7 @@ async function callGeminiDirect(text, systemPrompt, apiKey, model) {
 
 /**
  * Message shape:   { type: "TYPEPILOT_PROCESS", text: string }
- * Response shape:  { success: true,  alternatives: string[] }
+ * Response shape:  { success: true,  alternatives: string[], usage: object, model: string }
  *              or  { success: false, error: string, code: string, retriable: boolean }
  */
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -364,7 +364,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
 
-  if (message.type !== "TYPEPILOT_PROCESS") return false;
+  if (message?.type !== "TYPEPILOT_PROCESS") return false;
 
   (async () => {
     try {
