@@ -1,7 +1,12 @@
 <div align="center">
   <img src="./images/logo.png" width="280" alt="TypePilot Logo"/>
   <h1>TypePilot - AI Writing Assistant</h1>
+  <img src="https://img.shields.io/badge/version-1.1.0-6c63ff?style=flat-square" alt="Version 1.1.0"/>
+  <img src="https://img.shields.io/badge/manifest-v3-blue?style=flat-square" alt="Manifest V3"/>
+  <img src="https://img.shields.io/badge/powered%20by-Gemini-orange?style=flat-square" alt="Powered by Gemini"/>
 </div>
+
+<br>
 
 TypePilot is a powerful, lightweight Google Chrome extension that acts as your personal AI writing assistant. Built on top of the **Google Gemini API**, it allows you to instantly correct, rewrite, and elevate your text directly from any browser input field or text area.
 
@@ -11,6 +16,8 @@ TypePilot is a powerful, lightweight Google Chrome extension that acts as your p
 - **Bring Your Own Key (BYOK)**: Maximum privacy and security. You use your own free Google Gemini API key. No subscriptions, no hidden proxies.
 - **Dynamic Model Selection**: Connects directly to your Google AI Studio account and lets you seamlessly switch between lightning-fast models like **Gemini 2.5 Flash Lite**.
 - **Customizable System Prompt**: Tailor how the AI responds and corrects your text by modifying the core prompt inside the extension settings.
+- **Query Info Panel**: Click the ⓘ icon in the suggestions popup to see the model used and token counts (prompt / response / total) for every request.
+- **Broad Compatibility**: Works in standard inputs, rich-text editors (Gmail, Notion, Google Docs), and modern web components built with Shadow DOM.
 - **Beautiful & Fast UI**: A modern Settings panel and a clean, non-intrusive floating popup that integrates naturally with websites.
 
 ## 🚀 Installation (Unpacked Extension)
@@ -55,6 +62,9 @@ TypePilot communicates **directly** between your browser and the Google Gemini A
 - Created by **[KyriakosGian](https://github.com/KyriakosGian)**
 - Project Page: [miniapps.gr/TypePilotAi](https://miniapps.gr/TypePilotAi)
 - Supported by [ProCreta.gr](https://procreta.gr)
+
+## 📋 Changelog
+See [CHANGELOG.md](CHANGELOG.md) for the full version history.
 
 ---
 *If you find this project helpful, consider starring ⭐️ the repository on GitHub!*
