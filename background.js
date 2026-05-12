@@ -280,7 +280,7 @@ function extractTextOrThrow(data) {
  * @param {string} systemPrompt  - Correction instructions.
  * @param {string} apiKey        - User's Gemini API key.
  * @param {string} model         - Model ID (e.g. "gemini-2.5-flash-lite").
- * @returns {Promise<string[]>}
+ * @returns {Promise<{alternatives: string[], usage: object, model: string}>}
  * @throws  {TypePilotError}
  */
 async function callGeminiDirect(text, systemPrompt, apiKey, model) {
@@ -336,7 +336,15 @@ async function callGeminiDirect(text, systemPrompt, apiKey, model) {
   }
 
   const rawText = extractTextOrThrow(data);
-  return parseAlternatives(rawText);
+  const alternatives = parseAlternatives(rawText);
+
+  const usage = {
+    promptTokens:    data?.usageMetadata?.promptTokenCount    ?? null,
+    responseTokens:  data?.usageMetadata?.candidatesTokenCount ?? null,
+    totalTokens:     data?.usageMetadata?.totalTokenCount      ?? null,
+  };
+
+  return { alternatives, usage, model };
 }
 
 // ---------------------------------------------------------------------------
@@ -382,8 +390,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         );
       }
 
-      const alternatives = await callGeminiDirect(selectedText, systemPrompt, geminiKey, model);
-      sendResponse({ success: true, alternatives });
+      const result = await callGeminiDirect(selectedText, systemPrompt, geminiKey, model);
+      sendResponse({ success: true, alternatives: result.alternatives, usage: result.usage, model: result.model });
 
     } catch (err) {
       const tpe = err instanceof TypePilotError

@@ -207,6 +207,61 @@
   color: #fff;
 }
 
+/* Info button in the header */
+.typepilot-popup__info-btn {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: auto; /* pushes info + close to the right */
+  border-radius: 50%;
+  color: var(--lf-text-muted);
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.typepilot-popup__info-btn svg {
+  width: 15px;
+  height: 15px;
+}
+.typepilot-popup__info-btn:hover,
+.typepilot-popup__info-btn--active {
+  color: var(--lf-accent);
+  background: rgba(108, 99, 255, 0.12);
+}
+
+/* Info panel — slides in below the header */
+.typepilot-popup__info-panel {
+  padding: 8px 14px 10px;
+  background: var(--lf-bg);
+  border-bottom: 1px solid var(--lf-border);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.typepilot-popup__info-panel[hidden] {
+  display: none;
+}
+.typepilot-popup__info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.typepilot-popup__info-label {
+  font-size: 11px;
+  color: var(--lf-text-muted);
+}
+.typepilot-popup__info-value {
+  font-size: 11px;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color: var(--lf-text);
+  word-break: break-all;
+  text-align: right;
+}
+
 /* Error state */
 .typepilot-popup--error .typepilot-popup__header {
   background: rgba(248, 113, 113, 0.12);

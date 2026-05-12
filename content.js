@@ -278,7 +278,7 @@ async function handleFixButtonClick(explicitAnchor) {
     });
 
     if (response?.success && Array.isArray(response.alternatives)) {
-      showPopup(response.alternatives, anchorX, anchorY);
+      showPopup(response.alternatives, anchorX, anchorY, { model: response.model, usage: response.usage });
     } else {
       showErrorPopup({
         code:      response?.code      ?? "UNKNOWN",
@@ -405,7 +405,7 @@ function clampPopupToViewport(el, anchorY) {
 // Alternatives popup
 // ---------------------------------------------------------------------------
 
-function showPopup(alternatives, x, y) {
+function showPopup(alternatives, x, y, meta = {}) {
   removePopup();
   removeFloatingBtn();
 
@@ -415,19 +415,79 @@ function showPopup(alternatives, x, y) {
   popup.setAttribute("role", "dialog");
   popup.setAttribute("aria-label", "TypePilot AI Suggestions");
 
+  // ── Header ────────────────────────────────────────────────────────────────
   const header = document.createElement("div");
   header.className = "typepilot-popup__header";
-  header.innerHTML = `
-    <span class="typepilot-popup__title">
-      <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M10 2L12.09 7.26L17.5 8.27L13.75 11.97L14.62 17.5L10 14.77L5.38 17.5L6.25 11.97L2.5 8.27L7.91 7.26L10 2Z"
-          stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="currentColor" fill-opacity="0.15"/>
-      </svg>
-      TypePilot AI
-    </span>
-    <button class="typepilot-popup__close" aria-label="Close">✕</button>
+
+  const title = document.createElement("span");
+  title.className = "typepilot-popup__title";
+  title.innerHTML = `
+    <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10 2L12.09 7.26L17.5 8.27L13.75 11.97L14.62 17.5L10 14.77L5.38 17.5L6.25 11.97L2.5 8.27L7.91 7.26L10 2Z"
+        stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="currentColor" fill-opacity="0.15"/>
+    </svg>
+    TypePilot AI
   `;
-  popup.appendChild(header);
+  header.appendChild(title);
+
+  // Info button — only render if we have metadata to show
+  if (meta.model || meta.usage) {
+    const infoBtn = document.createElement("button");
+    infoBtn.className = "typepilot-popup__info-btn";
+    infoBtn.setAttribute("aria-label", "Query info");
+    infoBtn.setAttribute("aria-expanded", "false");
+    infoBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="10" cy="10" r="8.5" stroke="currentColor" stroke-width="1.4"/>
+      <path d="M10 9v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      <circle cx="10" cy="6.5" r="0.85" fill="currentColor"/>
+    </svg>`;
+
+    // Info panel (hidden by default)
+    const infoPanel = document.createElement("div");
+    infoPanel.className = "typepilot-popup__info-panel";
+    infoPanel.hidden = true;
+
+    const rows = [];
+    if (meta.model)                       rows.push(["Model",           meta.model]);
+    if (meta.usage?.promptTokens != null)  rows.push(["Prompt tokens",  meta.usage.promptTokens]);
+    if (meta.usage?.responseTokens != null) rows.push(["Response tokens", meta.usage.responseTokens]);
+    if (meta.usage?.totalTokens != null)   rows.push(["Total tokens",   meta.usage.totalTokens]);
+
+    rows.forEach(([label, value]) => {
+      const row = document.createElement("div");
+      row.className = "typepilot-popup__info-row";
+      const lbl = document.createElement("span");
+      lbl.className = "typepilot-popup__info-label";
+      lbl.textContent = label;
+      const val = document.createElement("span");
+      val.className = "typepilot-popup__info-value";
+      val.textContent = value;
+      row.appendChild(lbl);
+      row.appendChild(val);
+      infoPanel.appendChild(row);
+    });
+
+    infoBtn.addEventListener("click", () => {
+      const open = infoPanel.hidden;
+      infoPanel.hidden = !open;
+      infoBtn.setAttribute("aria-expanded", String(open));
+      infoBtn.classList.toggle("typepilot-popup__info-btn--active", open);
+    });
+
+    header.appendChild(infoBtn);
+
+    // Insert info panel right after header (before the list)
+    popup.appendChild(header);
+    popup.appendChild(infoPanel);
+  } else {
+    popup.appendChild(header);
+  }
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "typepilot-popup__close";
+  closeBtn.setAttribute("aria-label", "Close");
+  closeBtn.textContent = "✕";
+  header.appendChild(closeBtn);
 
   const slotLabels = ["✅ Corrected", "✨ Alternative 1", "🔀 Alternative 2"];
   const list = document.createElement("ul");
@@ -461,7 +521,7 @@ function showPopup(alternatives, x, y) {
 
   requestAnimationFrame(() => clampPopupToViewport(popup, y));
 
-  header.querySelector(".typepilot-popup__close").addEventListener("click", removeAllUI);
+  closeBtn.addEventListener("click", removeAllUI);
 }
 
 // ---------------------------------------------------------------------------
