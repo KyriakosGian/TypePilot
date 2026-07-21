@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "TypePilot",
   "version": "1.2.0",
-  "description": "Real-time, context-aware AI writing assistant. Highlight text to get instant corrections and rewrites.",
+  "description": "AI writing assistant for instant corrections, rewrites, translation, shortening, and tone changes with Google Gemini.",
   "permissions": ["storage"],
   "host_permissions": [
     "https://generativelanguage.googleapis.com/*"
