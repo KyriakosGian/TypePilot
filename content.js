@@ -1,620 +1,685 @@
 /**
- * content.js - TypePilot AI Content Script
- *
- * Responsibilities:
- *  - Detect text selections inside <textarea>, <input>, AND contenteditable elements.
- *  - Inject a floating "Fix with AI" button near the selection.
- *  - Send the selected text to the background service worker.
- *  - Display an alternatives popup and replace the original text on selection.
- *
- * Two selection modes are handled:
- *   "native"          → <textarea> and <input type="text|search|url|email">
- *                       Uses selectionStart / selectionEnd + .value
- *   "contenteditable" → [contenteditable] divs (Gmail, Notion, etc.)
- *                       Uses window.getSelection() + Range API
+ * TypePilot content script.
+ * Detects editable selections, renders the split Fix control, sends actions to
+ * the service worker and replaces the selected text with the chosen result.
  */
 
-// ---------------------------------------------------------------------------
-// State
-// ---------------------------------------------------------------------------
-
-/** The currently focused editable element (native or contenteditable root). */
 let activeElement = null;
-
-/**
- * Current editing mode.
- * @type {"native"|"contenteditable"}
- */
 let activeMode = "native";
-
-/** Saved offsets for native inputs. */
 let savedSelection = { start: 0, end: 0 };
-
-/** Saved Range object for contenteditable replacements. */
 let savedRange = null;
 
-/** The floating trigger button element (or null when absent). */
-let floatingBtn = null;
-
-/** The alternatives popup element (or null when absent). */
+let floatingControl = null;
+let primaryButton = null;
+let menuButton = null;
+let actionMenu = null;
 let popup = null;
+let activeRequestId = null;
 
-// ---------------------------------------------------------------------------
-// DOM cleanup helpers
-// ---------------------------------------------------------------------------
+const SECONDARY_ACTIONS = Object.freeze([
+  { id: "rewrite", label: "Rewrite", hint: "Improve clarity and flow" },
+  { id: "translate", label: "Translate to English", hint: "Natural English translation" },
+  { id: "shorten", label: "Shorten", hint: "Make the text concise" },
+  { id: "formal", label: "Formal tone", hint: "Professional wording" },
+  { id: "friendly", label: "Friendly tone", hint: "Warm, natural wording" },
+]);
 
-function removeFloatingBtn() {
-  if (floatingBtn) { floatingBtn.remove(); floatingBtn = null; }
+const ACTION_LABELS = Object.freeze({
+  fix: "Corrected",
+  rewrite: "Rewritten",
+  translate: "English Translation",
+  shorten: "Shortened",
+  formal: "Formal Tone",
+  friendly: "Friendly Tone",
+});
+
+function isTypePilotPath(path) {
+  return path.some((node) => node?.id === "typepilot-btn" || node?.id === "typepilot-popup");
+}
+
+function cancelActiveRequest() {
+  if (!activeRequestId) return;
+
+  const requestId = activeRequestId;
+  activeRequestId = null;
+  if (!chrome.runtime?.id) return;
+
+  try {
+    chrome.runtime.sendMessage({ type: "TYPEPILOT_CANCEL", requestId }).catch(() => {});
+  } catch {
+    // The extension may have been reloaded while this page remained open.
+  }
+}
+
+function removeFloatingControl() {
+  floatingControl?.remove();
+  floatingControl = null;
+  primaryButton = null;
+  menuButton = null;
+  actionMenu = null;
 }
 
 function removePopup() {
-  if (popup) { popup.remove(); popup = null; }
+  popup?.remove();
+  popup = null;
 }
 
-function removeAllUI() {
-  removeFloatingBtn();
+function removeAllUI({ cancelRequest = true } = {}) {
+  if (cancelRequest) cancelActiveRequest();
+  removeFloatingControl();
   removePopup();
 }
 
-// ---------------------------------------------------------------------------
-// Field type helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Check whether an element is a supported native editable field
- * (<textarea> or certain <input> types).
- * @param {Element} el
- * @returns {boolean}
- */
-function isNativeField(el) {
-  if (!el) return false;
-  if (el.tagName === "TEXTAREA") return true;
-  if (el.tagName === "INPUT" && /^(text|search|url|email)$/i.test(el.type ?? "text")) return true;
-  return false;
+function isNativeField(element) {
+  if (!element) return false;
+  if (element.tagName === "TEXTAREA") return true;
+  return element.tagName === "INPUT" && /^(text|search|url|email)$/i.test(element.type ?? "text");
 }
 
-/**
- * Check whether an element (or any of its ancestors) is a contenteditable root.
- * Returns the contenteditable root element, or null.
- * @param {Element} el
- * @returns {Element|null}
- */
-function getContentEditableRoot(el) {
-  if (!el) return null;
-  return el.closest('[contenteditable="true"], [contenteditable=""]') ?? null;
+function getContentEditableRoot(element) {
+  if (!element?.closest) return null;
+  return element.closest('[contenteditable="true"], [contenteditable=""]') ?? null;
 }
 
-/**
- * Return true if the element is any supported editable field.
- * @param {Element} el
- * @returns {boolean}
- */
-function isEditableField(el) {
-  return isNativeField(el) || !!getContentEditableRoot(el);
+function isEditableField(element) {
+  return isNativeField(element) || Boolean(getContentEditableRoot(element));
 }
-
-// ---------------------------------------------------------------------------
-// Focus tracking
-// ---------------------------------------------------------------------------
 
 document.addEventListener("focusin", (event) => {
-  // composedPath()[0] is the actual focused element even through shadow DOM boundaries.
-  const el = (event.composedPath?.() ?? [])[0] ?? event.target;
-  const ceRoot = getContentEditableRoot(el);
+  const path = event.composedPath?.() ?? [];
+  const element = path[0] ?? event.target;
+  const editableRoot = getContentEditableRoot(element);
 
-  if (ceRoot) {
-    activeElement = ceRoot;
+  if (editableRoot) {
+    activeElement = editableRoot;
     activeMode = "contenteditable";
-  } else if (isNativeField(el)) {
-    activeElement = el;
+  } else if (isNativeField(element)) {
+    activeElement = element;
     activeMode = "native";
   }
 });
 
-// ---------------------------------------------------------------------------
-// Floating trigger button
-// ---------------------------------------------------------------------------
-
-/**
- * Inject the floating "Fix" button near the mouse cursor.
- * @param {number} x - Viewport X.
- * @param {number} y - Viewport Y.
- */
-function showFloatingBtn(x, y) {
-  removeFloatingBtn();
-
-  floatingBtn = document.createElement("button");
-  floatingBtn.id = "typepilot-btn";
-  floatingBtn.className = "typepilot-btn";
-  floatingBtn.setAttribute("aria-label", "Fix with TypePilot AI");
-  floatingBtn.innerHTML = `
-    <svg class="typepilot-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+function createSparkleIcon() {
+  const icon = document.createElement("span");
+  icon.className = "typepilot-icon-wrap";
+  icon.innerHTML = `
+    <svg class="typepilot-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <path d="M10 2L12.09 7.26L17.5 8.27L13.75 11.97L14.62 17.5L10 14.77L5.38 17.5L6.25 11.97L2.5 8.27L7.91 7.26L10 2Z"
         stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="currentColor" fill-opacity="0.15"/>
-    </svg>
-    <span>Fix</span>
-  `;
-
-  floatingBtn.style.left = `${x + window.scrollX + 12}px`;
-  floatingBtn.style.top  = `${y + window.scrollY + 12}px`;
-
-  floatingBtn.addEventListener("click", handleFixButtonClick);
-  document.body.appendChild(floatingBtn);
+    </svg>`;
+  return icon;
 }
 
-function setButtonLoading() {
-  if (!floatingBtn) return;
-  floatingBtn.classList.add("typepilot-btn--loading");
-  floatingBtn.disabled = true;
-  floatingBtn.innerHTML = `<span class="typepilot-spinner"></span><span>Fixing…</span>`;
+function showFloatingControl(x, y) {
+  removeFloatingControl();
+  removePopup();
+
+  floatingControl = document.createElement("div");
+  floatingControl.id = "typepilot-btn";
+  floatingControl.className = "typepilot-split";
+  floatingControl.setAttribute("role", "group");
+  floatingControl.setAttribute("aria-label", "TypePilot writing actions");
+
+  primaryButton = document.createElement("button");
+  primaryButton.type = "button";
+  primaryButton.className = "typepilot-split__primary";
+  primaryButton.setAttribute("aria-label", "Fix selected text");
+  primaryButton.appendChild(createSparkleIcon());
+
+  const spinner = document.createElement("span");
+  spinner.className = "typepilot-spinner";
+  spinner.hidden = true;
+  primaryButton.appendChild(spinner);
+
+  const label = document.createElement("span");
+  label.className = "typepilot-split__label";
+  label.textContent = "Fix";
+  primaryButton.appendChild(label);
+  primaryButton.addEventListener("click", () => handleActionClick("fix"));
+
+  menuButton = document.createElement("button");
+  menuButton.type = "button";
+  menuButton.className = "typepilot-split__toggle";
+  menuButton.setAttribute("aria-label", "Open other TypePilot actions");
+  menuButton.setAttribute("aria-haspopup", "menu");
+  menuButton.setAttribute("aria-expanded", "false");
+  menuButton.innerHTML = `
+    <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+
+  actionMenu = document.createElement("div");
+  actionMenu.className = "typepilot-action-menu";
+  actionMenu.setAttribute("role", "menu");
+  actionMenu.hidden = true;
+
+  for (const action of SECONDARY_ACTIONS) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "typepilot-action-menu__item";
+    item.setAttribute("role", "menuitem");
+
+    const itemLabel = document.createElement("span");
+    itemLabel.className = "typepilot-action-menu__label";
+    itemLabel.textContent = action.label;
+
+    const itemHint = document.createElement("span");
+    itemHint.className = "typepilot-action-menu__hint";
+    itemHint.textContent = action.hint;
+
+    item.append(itemLabel, itemHint);
+    item.addEventListener("click", () => {
+      closeActionMenu();
+      handleActionClick(action.id);
+    });
+    actionMenu.appendChild(item);
+  }
+
+  menuButton.addEventListener("click", () => {
+    const willOpen = actionMenu.hidden;
+    actionMenu.hidden = !willOpen;
+    menuButton.setAttribute("aria-expanded", String(willOpen));
+    floatingControl.classList.toggle("typepilot-split--open", willOpen);
+
+    if (willOpen) {
+      requestAnimationFrame(() => {
+        positionActionMenu();
+        actionMenu.querySelector("button")?.focus({ preventScroll: true });
+      });
+    }
+  });
+
+  floatingControl.append(primaryButton, menuButton, actionMenu);
+  floatingControl.style.left = `${x + window.scrollX + 12}px`;
+  floatingControl.style.top = `${y + window.scrollY + 12}px`;
+  document.body.appendChild(floatingControl);
+
+  requestAnimationFrame(clampFloatingControl);
 }
 
-// ---------------------------------------------------------------------------
-// Mouse-up: detect selection
-// ---------------------------------------------------------------------------
+function closeActionMenu() {
+  if (!actionMenu || !menuButton || !floatingControl) return;
+  actionMenu.hidden = true;
+  menuButton.setAttribute("aria-expanded", "false");
+  floatingControl.classList.remove("typepilot-split--open", "typepilot-split--menu-up");
+}
+
+function clampFloatingControl() {
+  if (!floatingControl) return;
+
+  const rect = floatingControl.getBoundingClientRect();
+  const margin = 8;
+  let left = Number.parseFloat(floatingControl.style.left) || 0;
+  let top = Number.parseFloat(floatingControl.style.top) || 0;
+
+  if (rect.right > window.innerWidth - margin) left -= rect.right - window.innerWidth + margin;
+  if (rect.left < margin) left += margin - rect.left;
+  if (rect.bottom > window.innerHeight - margin) top -= rect.bottom - window.innerHeight + margin;
+  if (rect.top < margin) top += margin - rect.top;
+
+  floatingControl.style.left = `${left}px`;
+  floatingControl.style.top = `${top}px`;
+}
+
+function positionActionMenu() {
+  if (!actionMenu || !floatingControl) return;
+
+  floatingControl.classList.remove("typepilot-split--menu-up");
+  const menuRect = actionMenu.getBoundingClientRect();
+  if (menuRect.bottom > window.innerHeight - 8) {
+    floatingControl.classList.add("typepilot-split--menu-up");
+  }
+}
+
+function setControlLoading(isLoading) {
+  if (!floatingControl || !primaryButton || !menuButton) return;
+
+  floatingControl.classList.toggle("typepilot-split--loading", isLoading);
+  primaryButton.disabled = isLoading;
+  menuButton.disabled = isLoading;
+  primaryButton.setAttribute("aria-busy", String(isLoading));
+
+  const icon = primaryButton.querySelector(".typepilot-icon-wrap");
+  const spinner = primaryButton.querySelector(".typepilot-spinner");
+  if (icon) icon.hidden = isLoading;
+  if (spinner) spinner.hidden = !isLoading;
+  closeActionMenu();
+}
 
 document.addEventListener("mouseup", (event) => {
-  // Capture composedPath synchronously — it may be emptied after event dispatch.
-  // This also handles shadow DOM: event.target is retargeted to the shadow host,
-  // but composedPath() contains the real inner element.
-  const composedPath = event.composedPath?.() ?? [];
+  const path = event.composedPath?.() ?? [];
+  if (isTypePilotPath(path)) return;
 
-  // Ignore clicks on our own UI (check path, not just retargeted target).
-  if (composedPath.some(n => n?.id === "typepilot-btn" || n?.id === "typepilot-popup")) return;
+  const pathNativeField = path.find((node) => isNativeField(node));
+  if (pathNativeField) {
+    activeElement = pathNativeField;
+    activeMode = "native";
+  }
 
-  // For native fields inside shadow DOM, window.getSelection() won't track
-  // textarea selections. Check path membership here, before the timeout clears it.
   const wasInActiveNative =
     activeMode === "native" &&
     activeElement &&
     isNativeField(activeElement) &&
-    composedPath.includes(activeElement);
+    path.includes(activeElement);
 
   setTimeout(() => {
-    let selectedText = "";
-
     if (wasInActiveNative) {
-      // ── Native textarea / input (incl. inside shadow DOM) ────────────────
-      const start = activeElement.selectionStart;
-      const end   = activeElement.selectionEnd;
-      selectedText = activeElement.value.slice(start, end).trim();
+      const start = activeElement.selectionStart ?? 0;
+      const end = activeElement.selectionEnd ?? 0;
+      const selectedText = activeElement.value.slice(start, end).trim();
 
       if (selectedText.length >= 2) {
         savedSelection = { start, end };
         savedRange = null;
-        showFloatingBtn(event.clientX, event.clientY);
+        showFloatingControl(event.clientX, event.clientY);
       } else {
         removeAllUI();
       }
+      return;
+    }
+
+    const selection = window.getSelection();
+    let target = selection?.anchorNode;
+    if (target && target.nodeType !== Node.ELEMENT_NODE) target = target.parentElement;
+
+    const editableRoot = getContentEditableRoot(target);
+    if (!target || !isEditableField(target) || !editableRoot) {
+      removeAllUI();
+      return;
+    }
+
+    const selectedText = selection?.rangeCount ? selection.toString().trim() : "";
+    if (selectedText.length >= 2) {
+      activeElement = editableRoot;
+      activeMode = "contenteditable";
+      savedRange = selection.getRangeAt(0).cloneRange();
+      savedSelection = { start: 0, end: 0 };
+      showFloatingControl(event.clientX, event.clientY);
     } else {
-      // ── Contenteditable (Gmail, Notion, Google Docs, etc.) ───────────────
-      const sel = window.getSelection();
-      let targetEl = sel?.anchorNode;
-      if (targetEl && targetEl.nodeType !== Node.ELEMENT_NODE) {
-        targetEl = targetEl.parentElement;
-      }
-
-      if (!targetEl || !isEditableField(targetEl)) {
-        removeAllUI();
-        return;
-      }
-
-      if (sel && sel.rangeCount > 0) {
-        selectedText = sel.toString().trim();
-      }
-
-      if (selectedText.length >= 2) {
-        // Clone the range NOW so it survives DOM mutations later.
-        savedRange = window.getSelection().getRangeAt(0).cloneRange();
-        savedSelection = { start: 0, end: 0 };
-        showFloatingBtn(event.clientX, event.clientY);
-      } else {
-        removeAllUI();
-      }
+      removeAllUI();
     }
   }, 10);
 });
 
-// Close all UI when clicking outside our elements.
 document.addEventListener("mousedown", (event) => {
-  if (!event.target.closest("#typepilot-btn, #typepilot-popup")) {
-    removeAllUI();
-  }
+  const path = event.composedPath?.() ?? [];
+  if (!isTypePilotPath(path)) removeAllUI();
 });
 
-// Close popup on Escape.
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") removeAllUI();
+  if (event.key !== "Escape") return;
+  if (actionMenu && !actionMenu.hidden) {
+    closeActionMenu();
+    menuButton?.focus({ preventScroll: true });
+    return;
+  }
+  removeAllUI();
 });
 
-// ---------------------------------------------------------------------------
-// Fix button click handler
-// ---------------------------------------------------------------------------
-
-async function handleFixButtonClick(explicitAnchor) {
-  // Resolve selected text from the correct mode.
-  let selectedText = "";
-
+function getSelectedText() {
   if (activeMode === "native" && activeElement) {
-    selectedText = activeElement.value.slice(savedSelection.start, savedSelection.end);
-  } else if (savedRange) {
-    selectedText = savedRange.toString();
+    return activeElement.value.slice(savedSelection.start, savedSelection.end);
+  }
+  return savedRange?.toString() ?? "";
+}
+
+function createRequestId() {
+  if (typeof crypto?.randomUUID === "function") return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function handleActionClick(actionId = "fix", explicitAnchor = null, explicitText = null) {
+  const selectedText = explicitText ?? getSelectedText();
+  if (!selectedText.trim()) {
+    removeAllUI();
+    return;
   }
 
-  if (!selectedText.trim()) { removeAllUI(); return; }
-
-  // Anchor for the result/error popup. Prefer explicit (used by retry) over
-  // the floating button's current rect.
-  let anchorX, anchorY;
+  let anchorX;
+  let anchorY;
   if (explicitAnchor) {
     anchorX = explicitAnchor.x;
     anchorY = explicitAnchor.y;
-  } else if (floatingBtn) {
-    const btnRect = floatingBtn.getBoundingClientRect();
-    anchorX = btnRect.left;
-    anchorY = btnRect.bottom;
+  } else if (floatingControl) {
+    const rect = floatingControl.getBoundingClientRect();
+    anchorX = rect.left;
+    anchorY = rect.bottom;
   } else {
-    // No anchor available — bail silently rather than throwing.
     return;
   }
 
-  if (floatingBtn) setButtonLoading();
+  cancelActiveRequest();
+  setControlLoading(true);
 
-  // Guard: check that the extension context is still valid before messaging.
-  // This catches the case where the extension was reloaded while the tab was open.
   if (!chrome.runtime?.id) {
     showErrorPopup({
-      code:      "CONTEXT_INVALIDATED",
-      message:   "TypePilot was updated. Reload this page (F5) to continue.",
+      code: "CONTEXT_INVALIDATED",
+      message: "TypePilot was updated. Reload this page to continue.",
       retriable: false,
-    }, anchorX, anchorY, selectedText);
+    }, anchorX, anchorY, { text: selectedText, actionId });
     return;
   }
+
+  const requestId = createRequestId();
+  activeRequestId = requestId;
 
   try {
     const response = await chrome.runtime.sendMessage({
       type: "TYPEPILOT_PROCESS",
+      requestId,
+      action: actionId,
       text: selectedText,
     });
 
-    if (response?.success && Array.isArray(response.alternatives)) {
-      showPopup(response.alternatives, anchorX, anchorY, { model: response.model, usage: response.usage });
-    } else {
-      showErrorPopup({
-        code:      response?.code      ?? "UNKNOWN",
-        message:   response?.error     ?? "Unknown error.",
-        retriable: response?.retriable ?? false,
-      }, anchorX, anchorY, selectedText);
+    if (activeRequestId !== requestId) return;
+    activeRequestId = null;
+
+    if (response?.success && typeof response.result === "string") {
+      showResultPopup(response.result, anchorX, anchorY, {
+        action: response.action ?? actionId,
+        actionLabel: response.actionLabel ?? ACTION_LABELS[actionId],
+        model: response.model,
+        usage: response.usage,
+        durationMs: response.durationMs,
+        cached: response.cached,
+      });
+      return;
     }
-  } catch (err) {
-    console.error("[TypePilot] Message error:", err);
 
-    // "Extension context invalidated" → stale content script after extension reload.
-    const isContextErr = err.message?.includes("Extension context invalidated")
-                      || err.message?.includes("context invalidated");
-
+    if (response?.code === "CANCELLED") return;
     showErrorPopup({
-      code:      isContextErr ? "CONTEXT_INVALIDATED" : "MESSAGING_ERROR",
-      message:   isContextErr
-        ? "TypePilot was updated. Reload this page (F5) to continue."
-        : (err.message || "Could not reach the background service worker."),
-      retriable: !isContextErr,
-    }, anchorX, anchorY, selectedText);
+      code: response?.code ?? "UNKNOWN",
+      message: response?.error ?? "Unknown error.",
+      retriable: response?.retriable ?? false,
+    }, anchorX, anchorY, { text: selectedText, actionId });
+  } catch (error) {
+    if (activeRequestId !== requestId) return;
+    activeRequestId = null;
+
+    const isContextError = error?.message?.toLowerCase().includes("context invalidated");
+    showErrorPopup({
+      code: isContextError ? "CONTEXT_INVALIDATED" : "MESSAGING_ERROR",
+      message: isContextError
+        ? "TypePilot was updated. Reload this page to continue."
+        : (error?.message || "Could not reach the TypePilot service worker."),
+      retriable: !isContextError,
+    }, anchorX, anchorY, { text: selectedText, actionId });
   }
 }
 
-// ---------------------------------------------------------------------------
-// Text replacement
-// ---------------------------------------------------------------------------
+function setNativeFieldValue(element, value) {
+  const prototype = element.tagName === "TEXTAREA"
+    ? HTMLTextAreaElement.prototype
+    : HTMLInputElement.prototype;
+  const nativeSetter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
 
-/**
- * Replace the saved selection with the chosen alternative.
- * Dispatches input/change events so React/Vue/Angular apps detect the change.
- * @param {string} replacement
- */
+  if (nativeSetter) nativeSetter.call(element, value);
+  else element.value = value;
+}
+
 function replaceSelectedText(replacement) {
   if (activeMode === "native" && activeElement) {
-    // ── Native ──────────────────────────────────────────────────────────────
     const { start, end } = savedSelection;
     const original = activeElement.value;
-    activeElement.value = original.slice(0, start) + replacement + original.slice(end);
+    const nextValue = original.slice(0, start) + replacement + original.slice(end);
 
+    const beforeInput = new InputEvent("beforeinput", {
+      bubbles: true,
+      cancelable: true,
+      inputType: "insertReplacementText",
+      data: replacement,
+    });
+    if (!activeElement.dispatchEvent(beforeInput)) return;
+
+    setNativeFieldValue(activeElement, nextValue);
     const newCursor = start + replacement.length;
     activeElement.setSelectionRange(newCursor, newCursor);
     activeElement.focus();
-
-    activeElement.dispatchEvent(new Event("input",  { bubbles: true }));
+    activeElement.dispatchEvent(new InputEvent("input", {
+      bubbles: true,
+      inputType: "insertReplacementText",
+      data: replacement,
+    }));
     activeElement.dispatchEvent(new Event("change", { bubbles: true }));
-
   } else if (savedRange) {
-    // ── Contenteditable ─────────────────────────────────────────────────────
     try {
-      // Restore the saved range into the live selection first.
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(savedRange);
+      activeElement?.focus();
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(savedRange);
 
-      // Delete selected content and insert replacement.
-      savedRange.deleteContents();
-      const textNode = document.createTextNode(replacement);
-      savedRange.insertNode(textNode);
+      const beforeInput = new InputEvent("beforeinput", {
+        bubbles: true,
+        cancelable: true,
+        inputType: "insertText",
+        data: replacement,
+      });
+      if (activeElement && !activeElement.dispatchEvent(beforeInput)) return;
 
-      // Move caret to end of inserted text.
-      savedRange.setStartAfter(textNode);
-      savedRange.setEndAfter(textNode);
-      sel.removeAllRanges();
-      sel.addRange(savedRange);
-
-      // Notify the host framework about the change.
-      if (activeElement) {
-        activeElement.dispatchEvent(
-          new InputEvent("input", {
-            bubbles:   true,
-            inputType: "insertText",
-            data:      replacement,
-          })
-        );
+      let inserted = false;
+      try {
+        inserted = document.execCommand("insertText", false, replacement);
+      } catch {
+        inserted = false;
       }
-    } catch (err) {
-      console.error("[TypePilot] contenteditable replacement error:", err);
+
+      if (!inserted) {
+        savedRange.deleteContents();
+        const textNode = document.createTextNode(replacement);
+        savedRange.insertNode(textNode);
+        savedRange.setStartAfter(textNode);
+        savedRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(savedRange);
+
+        activeElement?.dispatchEvent(new InputEvent("input", {
+          bubbles: true,
+          inputType: "insertText",
+          data: replacement,
+        }));
+      }
+    } catch (error) {
+      console.error("[TypePilot] Contenteditable replacement error:", error);
     }
   }
 
-  removeAllUI();
+  removeAllUI({ cancelRequest: false });
 }
 
-// ---------------------------------------------------------------------------
-// Popup positioning helper
-// ---------------------------------------------------------------------------
-
-/**
- * Clamp a popup element fully inside the viewport.
- * Tries to flip above the anchor if overflowing the bottom.
- * Falls back to clamping all four edges so the popup is always visible.
- * @param {HTMLElement} el
- * @param {number} anchorY - Viewport Y of the anchor point (used for flipping).
- */
-function clampPopupToViewport(el, anchorY) {
-  const rect   = el.getBoundingClientRect();
+function clampPopupToViewport(element, anchorY) {
+  const rect = element.getBoundingClientRect();
   const margin = 8;
+  let left = Number.parseFloat(element.style.left) || 0;
+  let top = Number.parseFloat(element.style.top) || 0;
 
-  // ── Horizontal ──────────────────────────────────────────────────────────
-  let vLeft = parseFloat(el.style.left) - window.scrollX;
-  if (vLeft + rect.width > window.innerWidth - margin) {
-    vLeft = window.innerWidth - rect.width - margin;
+  if (rect.right > window.innerWidth - margin) left -= rect.right - window.innerWidth + margin;
+  if (rect.left < margin) left += margin - rect.left;
+  if (rect.bottom > window.innerHeight - margin) {
+    top = anchorY + window.scrollY - rect.height - margin;
   }
-  if (vLeft < margin) vLeft = margin;
-  el.style.left = `${vLeft + window.scrollX}px`;
+  if (top - window.scrollY < margin) top = window.scrollY + margin;
 
-  // ── Vertical ────────────────────────────────────────────────────────────
-  let vTop = parseFloat(el.style.top) - window.scrollY;
-  // Overflows bottom → try flipping above the anchor
-  if (vTop + rect.height > window.innerHeight - margin) {
-    vTop = anchorY - rect.height - margin;
-  }
-  // Clamp top edge (handles flip going above viewport or tiny viewports)
-  if (vTop < margin) vTop = margin;
-  // Final clamp bottom (last resort when popup taller than viewport)
-  if (vTop + rect.height > window.innerHeight - margin) {
-    vTop = Math.max(margin, window.innerHeight - rect.height - margin);
-  }
-  el.style.top = `${vTop + window.scrollY}px`;
+  element.style.left = `${left}px`;
+  element.style.top = `${top}px`;
 }
 
-// ---------------------------------------------------------------------------
-// Alternatives popup
-// ---------------------------------------------------------------------------
+function createPopupHeader(titleText, meta = null) {
+  const header = document.createElement("div");
+  header.className = "typepilot-popup__header";
 
-function showPopup(alternatives, x, y, meta = {}) {
+  const title = document.createElement("span");
+  title.className = "typepilot-popup__title";
+  title.appendChild(createSparkleIcon());
+  const titleLabel = document.createElement("span");
+  titleLabel.textContent = titleText;
+  title.appendChild(titleLabel);
+  header.appendChild(title);
+
+  let infoPanel = null;
+  if (meta) {
+    const infoButton = document.createElement("button");
+    infoButton.type = "button";
+    infoButton.className = "typepilot-popup__info-btn";
+    infoButton.setAttribute("aria-label", "Request information");
+    infoButton.setAttribute("aria-expanded", "false");
+    infoButton.innerHTML = `
+      <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M10 9v5M10 6.2v.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+      </svg>`;
+
+    infoPanel = document.createElement("div");
+    infoPanel.className = "typepilot-popup__info-panel";
+    infoPanel.hidden = true;
+
+    const rows = [];
+    if (meta.model) rows.push(["Model", meta.model]);
+    if (meta.actionLabel) rows.push(["Action", meta.actionLabel]);
+    if (meta.usage?.promptTokens != null) rows.push(["Prompt tokens", meta.usage.promptTokens]);
+    if (meta.usage?.responseTokens != null) rows.push(["Response tokens", meta.usage.responseTokens]);
+    if (meta.usage?.totalTokens != null) rows.push(["Total tokens", meta.usage.totalTokens]);
+    if (meta.durationMs != null) rows.push(["Response time", meta.cached ? "Instant cache" : `${(meta.durationMs / 1000).toFixed(2)} s`]);
+
+    for (const [label, value] of rows) {
+      const row = document.createElement("div");
+      row.className = "typepilot-popup__info-row";
+      const labelElement = document.createElement("span");
+      labelElement.className = "typepilot-popup__info-label";
+      labelElement.textContent = label;
+      const valueElement = document.createElement("span");
+      valueElement.className = "typepilot-popup__info-value";
+      valueElement.textContent = value;
+      row.append(labelElement, valueElement);
+      infoPanel.appendChild(row);
+    }
+
+    infoButton.addEventListener("click", () => {
+      const willOpen = infoPanel.hidden;
+      infoPanel.hidden = !willOpen;
+      infoButton.setAttribute("aria-expanded", String(willOpen));
+      infoButton.classList.toggle("typepilot-popup__info-btn--active", willOpen);
+    });
+    header.appendChild(infoButton);
+  }
+
+  const closeButton = document.createElement("button");
+  closeButton.type = "button";
+  closeButton.className = "typepilot-popup__close";
+  closeButton.setAttribute("aria-label", "Close");
+  closeButton.textContent = "×";
+  closeButton.addEventListener("click", () => removeAllUI({ cancelRequest: false }));
+  header.appendChild(closeButton);
+
+  return { header, infoPanel };
+}
+
+function showResultPopup(result, x, y, meta = {}) {
+  removeFloatingControl();
   removePopup();
-  removeFloatingBtn();
 
   popup = document.createElement("div");
   popup.id = "typepilot-popup";
   popup.className = "typepilot-popup";
   popup.setAttribute("role", "dialog");
-  popup.setAttribute("aria-label", "TypePilot AI Suggestions");
+  popup.setAttribute("aria-label", "TypePilot result");
 
-  // ── Header ────────────────────────────────────────────────────────────────
-  const header = document.createElement("div");
-  header.className = "typepilot-popup__header";
+  const actionLabel = meta.actionLabel ?? ACTION_LABELS[meta.action] ?? "Result";
+  const { header, infoPanel } = createPopupHeader("TypePilot", { ...meta, actionLabel });
+  popup.appendChild(header);
+  if (infoPanel) popup.appendChild(infoPanel);
 
-  const title = document.createElement("span");
-  title.className = "typepilot-popup__title";
-  title.innerHTML = `
-    <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M10 2L12.09 7.26L17.5 8.27L13.75 11.97L14.62 17.5L10 14.77L5.38 17.5L6.25 11.97L2.5 8.27L7.91 7.26L10 2Z"
-        stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="currentColor" fill-opacity="0.15"/>
-    </svg>
-    TypePilot AI
-  `;
-  header.appendChild(title);
-
-  // Info button — only render if we have metadata to show
-  if (meta.model || meta.usage) {
-    const infoBtn = document.createElement("button");
-    infoBtn.className = "typepilot-popup__info-btn";
-    infoBtn.setAttribute("aria-label", "Query info");
-    infoBtn.setAttribute("aria-expanded", "false");
-    infoBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="10" cy="10" r="8.5" stroke="currentColor" stroke-width="1.4"/>
-      <path d="M10 9v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-      <circle cx="10" cy="6.5" r="0.85" fill="currentColor"/>
-    </svg>`;
-
-    // Info panel (hidden by default)
-    const infoPanel = document.createElement("div");
-    infoPanel.className = "typepilot-popup__info-panel";
-    infoPanel.hidden = true;
-
-    const rows = [];
-    if (meta.model)                       rows.push(["Model",           meta.model]);
-    if (meta.usage?.promptTokens != null)  rows.push(["Prompt tokens",  meta.usage.promptTokens]);
-    if (meta.usage?.responseTokens != null) rows.push(["Response tokens", meta.usage.responseTokens]);
-    if (meta.usage?.totalTokens != null)   rows.push(["Total tokens",   meta.usage.totalTokens]);
-
-    rows.forEach(([label, value]) => {
-      const row = document.createElement("div");
-      row.className = "typepilot-popup__info-row";
-      const lbl = document.createElement("span");
-      lbl.className = "typepilot-popup__info-label";
-      lbl.textContent = label;
-      const val = document.createElement("span");
-      val.className = "typepilot-popup__info-value";
-      val.textContent = value;
-      row.appendChild(lbl);
-      row.appendChild(val);
-      infoPanel.appendChild(row);
-    });
-
-    infoBtn.addEventListener("click", () => {
-      const open = infoPanel.hidden;
-      infoPanel.hidden = !open;
-      infoBtn.setAttribute("aria-expanded", String(open));
-      infoBtn.classList.toggle("typepilot-popup__info-btn--active", open);
-    });
-
-    header.appendChild(infoBtn);
-
-    // Insert info panel right after header (before the list)
-    popup.appendChild(header);
-    popup.appendChild(infoPanel);
-  } else {
-    popup.appendChild(header);
-  }
-
-  const closeBtn = document.createElement("button");
-  closeBtn.className = "typepilot-popup__close";
-  closeBtn.setAttribute("aria-label", "Close");
-  closeBtn.textContent = "✕";
-  header.appendChild(closeBtn);
-
-  const slotLabels = ["✅ Corrected", "✨ Alternative 1", "🔀 Alternative 2"];
-  const list = document.createElement("ul");
+  const list = document.createElement("div");
   list.className = "typepilot-popup__list";
 
-  alternatives.forEach((alt, index) => {
-    if (!alt) return;
-    const item  = document.createElement("li");
-    item.className = "typepilot-popup__item";
+  const item = document.createElement("div");
+  item.className = "typepilot-popup__item";
+  const label = document.createElement("span");
+  label.className = "typepilot-popup__item-label";
+  label.textContent = actionLabel;
 
-    const label = document.createElement("span");
-    label.className = "typepilot-popup__item-label";
-    label.textContent = slotLabels[index] ?? `Option ${index + 1}`;
+  const resultButton = document.createElement("button");
+  resultButton.type = "button";
+  resultButton.className = "typepilot-popup__item-text";
+  resultButton.textContent = result;
+  resultButton.title = "Replace the selected text";
+  resultButton.addEventListener("click", () => replaceSelectedText(result));
 
-    const btn = document.createElement("button");
-    btn.className = "typepilot-popup__item-text";
-    btn.textContent = alt;
-    btn.addEventListener("click", () => replaceSelectedText(alt));
-
-    item.appendChild(label);
-    item.appendChild(btn);
-    list.appendChild(item);
-  });
-
+  item.append(label, resultButton);
+  list.appendChild(item);
   popup.appendChild(list);
 
-  const margin = 8;
-  popup.style.left = `${x + window.scrollX + margin}px`;
-  popup.style.top  = `${y + window.scrollY + margin}px`;
+  const hint = document.createElement("p");
+  hint.className = "typepilot-popup__hint";
+  hint.textContent = "Click the result to replace the selected text.";
+  popup.appendChild(hint);
+
+  popup.style.left = `${x + window.scrollX + 8}px`;
+  popup.style.top = `${y + window.scrollY + 8}px`;
   document.body.appendChild(popup);
-
   requestAnimationFrame(() => clampPopupToViewport(popup, y));
-
-  closeBtn.addEventListener("click", removeAllUI);
 }
 
-// ---------------------------------------------------------------------------
-// Error popup
-// ---------------------------------------------------------------------------
-
-/**
- * Render an error popup using safe DOM construction (no innerHTML interpolation).
- *
- * @param {{code: string, message: string, retriable: boolean}} error
- * @param {number} x        - Anchor X (viewport).
- * @param {number} y        - Anchor Y (viewport).
- * @param {string} [retryText] - If provided + error.retriable, shows a Try Again button.
- */
-function showErrorPopup(error, x, y, retryText) {
+function showErrorPopup(error, x, y, retryContext = null) {
+  removeFloatingControl();
   removePopup();
-  removeFloatingBtn();
 
-  const { code = "UNKNOWN", message = "Unknown error.", retriable = false } = error || {};
-
+  const { code = "UNKNOWN", message = "Unknown error.", retriable = false } = error ?? {};
   popup = document.createElement("div");
   popup.id = "typepilot-popup";
   popup.className = "typepilot-popup typepilot-popup--error";
   popup.setAttribute("role", "alert");
 
-  // ── Header ────────────────────────────────────────────────────────────────
-  const header = document.createElement("div");
-  header.className = "typepilot-popup__header";
-
-  const title = document.createElement("span");
-  title.className = "typepilot-popup__title";
-  title.textContent = "⚠ TypePilot Error";
-  header.appendChild(title);
-
+  const { header } = createPopupHeader("TypePilot Error");
   const codeBadge = document.createElement("span");
-  codeBadge.className   = "typepilot-popup__code";
+  codeBadge.className = "typepilot-popup__code";
   codeBadge.textContent = code;
-  codeBadge.title       = "Error code (for support / debugging)";
-  header.appendChild(codeBadge);
-
-  const closeBtn = document.createElement("button");
-  closeBtn.className = "typepilot-popup__close";
-  closeBtn.setAttribute("aria-label", "Close");
-  closeBtn.textContent = "✕";
-  closeBtn.addEventListener("click", removeAllUI);
-  header.appendChild(closeBtn);
-
+  codeBadge.title = "Error code";
+  header.insertBefore(codeBadge, header.lastElementChild);
   popup.appendChild(header);
 
-  // ── Message body (textContent → safe from XSS) ────────────────────────────
-  const msg = document.createElement("p");
-  msg.className   = "typepilot-popup__error-msg";
-  msg.textContent = message;
-  popup.appendChild(msg);
+  const messageElement = document.createElement("p");
+  messageElement.className = "typepilot-popup__error-msg";
+  messageElement.textContent = message;
+  popup.appendChild(messageElement);
 
-  // ── Action row ────────────────────────────────────────────────────────────
   const actions = document.createElement("div");
   actions.className = "typepilot-popup__actions";
 
-  if (retriable && retryText) {
-    const retryBtn = document.createElement("button");
-    retryBtn.className   = "typepilot-popup__btn typepilot-popup__btn--primary";
-    retryBtn.textContent = "Try Again";
-    retryBtn.addEventListener("click", () => {
+  if (retriable && retryContext?.text) {
+    const retryButton = document.createElement("button");
+    retryButton.type = "button";
+    retryButton.className = "typepilot-popup__btn typepilot-popup__btn--primary";
+    retryButton.textContent = "Try Again";
+    retryButton.addEventListener("click", () => {
       removePopup();
-      // Re-run with the same anchor coords (no need to recreate the floating button).
-      handleFixButtonClick({ x, y });
+      showFloatingControl(x, y);
+      handleActionClick(retryContext.actionId, { x, y }, retryContext.text);
     });
-    actions.appendChild(retryBtn);
+    actions.appendChild(retryButton);
   }
 
-  // "Open Settings" shortcut for key/quota related errors.
-  if (code === "NO_KEY" || code === "INVALID_KEY" || code === "MODEL_NOT_FOUND" || code === "QUOTA_EXCEEDED") {
-    const settingsBtn = document.createElement("button");
-    settingsBtn.className   = "typepilot-popup__btn";
-    settingsBtn.textContent = "Open Settings";
-    settingsBtn.addEventListener("click", () => {
-      try {
-        chrome.runtime.sendMessage({ type: "TYPEPILOT_OPEN_SETTINGS" });
-      } catch { /* context invalidated — ignore */ }
-      removeAllUI();
+  if (["NO_KEY", "INVALID_KEY", "MODEL_NOT_FOUND", "QUOTA_EXCEEDED"].includes(code)) {
+    const settingsButton = document.createElement("button");
+    settingsButton.type = "button";
+    settingsButton.className = "typepilot-popup__btn";
+    settingsButton.textContent = "Open Settings";
+    settingsButton.addEventListener("click", () => {
+      if (chrome.runtime?.id) {
+        try {
+          chrome.runtime.sendMessage({ type: "TYPEPILOT_OPEN_SETTINGS" }).catch(() => {});
+        } catch {
+          // The page must be reloaded if the extension context is stale.
+        }
+      }
+      removeAllUI({ cancelRequest: false });
     });
-    actions.appendChild(settingsBtn);
+    actions.appendChild(settingsButton);
   }
 
-  if (actions.children.length > 0) {
-    popup.appendChild(actions);
-  }
+  if (actions.children.length) popup.appendChild(actions);
 
-  // ── Position ──────────────────────────────────────────────────────────────
   popup.style.left = `${x + window.scrollX}px`;
-  popup.style.top  = `${y + window.scrollY + 8}px`;
+  popup.style.top = `${y + window.scrollY + 8}px`;
   document.body.appendChild(popup);
-
   requestAnimationFrame(() => clampPopupToViewport(popup, y));
 }

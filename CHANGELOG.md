@@ -2,25 +2,52 @@
 
 All notable changes to TypePilot are documented here.
 
----
-
-## [1.1.0] — 2026-05-12
+## [1.2.0] - 2026-07-20
 
 ### Added
-- **Query info panel** — a new ⓘ icon in the suggestions popup reveals the model used, prompt tokens, response tokens, and total tokens for each request, sourced directly from the Gemini API response metadata.
+
+- Split Fix control with a dropdown for Rewrite, Translate to English, Shorten, Formal tone, and Friendly tone.
+- Single-result actions for faster responses and lower output-token usage.
+- Gemini structured-output schema with a typed `result` field.
+- Gemini 3.1 Flash-Lite and Gemini 3.5 Flash model choices when available to the user's API key.
+- Personal dictionary for protected terms.
+- Five-minute in-memory cache for identical requests.
+- Request cancellation and one automatic retry for transient failures.
+- Response-time and cache information in the request details panel.
+
+### Changed
+
+- API keys are sent through the `x-goog-api-key` header instead of the request URL.
+- Model discovery now shows compatible text-generation models only and prioritizes current Flash models.
+- Correction actions use lower temperature for more consistent results.
+- Native-field replacement now uses the platform value setter for better React compatibility.
+- Contenteditable replacement now prefers browser-native insertion to preserve editor behavior.
+- The API key storage area is restricted to trusted extension contexts.
+- Removed unused `activeTab`, `scripting`, and `tabs` permissions.
+- Removed the external font request from the Settings page.
 
 ### Fixed
-- **Shadow DOM support** — the Fix button now appears correctly inside web components that render their textarea inside a shadow root (e.g. Reddit's composer, Lit-based inputs). Previously, event retargeting caused the selection check to fail silently.
-- **Response truncation** — raised `maxOutputTokens` from 1024 to 4096. Long or multilingual texts were hitting the limit mid-JSON, producing a spurious "invalid JSON" error.
-- **Clearer truncation error** — when the model still hits the token limit (e.g. an unusually long selection), the error now reads "The selected text is too long…" instead of the misleading "invalid JSON" message.
 
----
+- Corrected model filtering for image, audio, live, embedding, and other incompatible models.
+- Removed the incorrect third-result label from the previous multi-result interface.
+- Retry now repeats the exact failed action and selected text.
 
-## [1.0.0] — Initial release
+## [1.1.0] - 2026-05-12
 
-- Floating Fix button on text selection in any `<textarea>`, `<input>`, or `contenteditable` field.
-- Three AI alternatives per request: corrected text, rewrite, and English translation.
-- Bring Your Own Key (BYOK) — direct browser → Gemini API, no backend.
-- Live model picker in Settings sourced from the user's Google AI Studio account.
-- Customisable system prompt.
-- Stable error codes with retriable/non-retriable distinction and a Try Again button.
+### Added
+
+- Query information panel showing model and token usage.
+
+### Fixed
+
+- Shadow DOM selection support.
+- Increased `maxOutputTokens` from 1024 to 4096.
+- Clearer error when a response reaches the output-token limit.
+
+## [1.0.0] - Initial release
+
+- Floating Fix button for native and contenteditable fields.
+- Corrected text, rewrite, and English translation results.
+- Direct browser-to-Gemini BYOK communication.
+- Live model picker and customizable system prompt.
+- Stable error codes and manual retry support.
