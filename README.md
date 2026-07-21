@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./images/logo.png" width="280" alt="TypePilot Logo"/>
+  <img src="./store-assets/small-promo-440x280.png" width="440" alt="TypePilot Chrome Web Store promo"/>
   <h1>TypePilot - AI Writing Assistant</h1>
   <img src="https://img.shields.io/badge/version-1.2.0-6c63ff?style=flat-square" alt="Version 1.2.0"/>
   <img src="https://img.shields.io/badge/manifest-v3-blue?style=flat-square" alt="Manifest V3"/>
