@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TypePilot Store Demo</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: #182036;
+      background:
+        radial-gradient(circle at 85% 8%, rgba(108, 99, 255, 0.18), transparent 34%),
+        linear-gradient(145deg, #f7f8ff 0%, #eef2ff 100%);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .topbar {
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 48px;
+      background: rgba(255, 255, 255, 0.88);
+      border-bottom: 1px solid #e2e6f3;
+      backdrop-filter: blur(18px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 760;
+      letter-spacing: -0.02em;
+    }
+
+    .brand img {
+      width: 38px;
+      height: 38px;
+    }
+
+    .topbar__label {
+      color: #78819a;
+      font-size: 14px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 230px minmax(0, 820px);
+      justify-content: center;
+      gap: 32px;
+      padding: 46px 42px;
+    }
+
+    .sidebar {
+      padding: 20px;
+      border: 1px solid rgba(217, 222, 239, 0.9);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.66);
+      box-shadow: 0 16px 50px rgba(39, 44, 90, 0.08);
+    }
+
+    .sidebar h2 {
+      margin: 0 0 18px;
+      color: #303852;
+      font-size: 15px;
+    }
+
+    .nav-item {
+      margin: 8px 0;
+      padding: 11px 13px;
+      color: #68718b;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+
+    .nav-item--active {
+      color: #5149d8;
+      background: #ecebff;
+      font-weight: 650;
+    }
+
+    .composer {
+      overflow: hidden;
+      border: 1px solid #dce1ef;
+      border-radius: 22px;
+      background: #fff;
+      box-shadow: 0 24px 70px rgba(32, 41, 82, 0.14);
+    }
+
+    .composer__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 26px;
+      color: #242c44;
+      background: #fafbff;
+      border-bottom: 1px solid #e7eaf3;
+    }
+
+    .composer__head strong {
+      font-size: 18px;
+    }
+
+    .composer__status {
+      color: #8b93a8;
+      font-size: 13px;
+    }
+
+    .field-row {
+      display: flex;
+      gap: 16px;
+      padding: 15px 26px;
+      border-bottom: 1px solid #edf0f6;
+      font-size: 14px;
+    }
+
+    .field-row span {
+      width: 56px;
+      color: #9299ac;
+    }
+
+    .field-row strong {
+      color: #343d57;
+      font-weight: 550;
+    }
+
+    .editor-wrap {
+      min-height: 300px;
+      padding: 32px 34px;
+    }
+
+    #message-editor {
+      min-height: 220px;
+      outline: none;
+      color: #30384f;
+      font-size: 19px;
+      line-height: 1.75;
+    }
+
+    #message-editor p {
+      margin: 0 0 18px;
+    }
+
+    .composer__footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 26px;
+      border-top: 1px solid #edf0f6;
+      background: #fafbff;
+    }
+
+    .send-button {
+      padding: 11px 26px;
+      color: #fff;
+      border: 0;
+      border-radius: 10px;
+      background: #6c63ff;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .footer-hint {
+      color: #9299ac;
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="../icons/icon128.png" alt="TypePilot" />
+      <span>Demo Mail</span>
+    </div>
+    <div class="topbar__label">TypePilot writing workspace</div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <h2>Workspace</h2>
+      <div class="nav-item nav-item--active">New message</div>
+      <div class="nav-item">Drafts</div>
+      <div class="nav-item">Sent</div>
+      <div class="nav-item">Templates</div>
+    </aside>
+
+    <section class="composer">
+      <div class="composer__head">
+        <strong>New message</strong>
+        <span class="composer__status">Draft saved locally</span>
+      </div>
+      <div class="field-row"><span>To</span><strong>project@example.com</strong></div>
+      <div class="field-row"><span>Subject</span><strong>Project timeline</strong></div>
+      <div class="editor-wrap">
+        <div id="message-editor" contenteditable="true" spellcheck="false" aria-label="Message body">
+          <p>Hello,</p>
+          <p>Please review the attached proposal and let me know if the timeline work for your team.</p>
+          <p>Thank you.</p>
+        </div>
+      </div>
+      <div class="composer__footer">
+        <button class="send-button" type="button">Send</button>
+        <span class="footer-hint">Select text to use TypePilot</span>
+      </div>
+    </section>
+  </main>
+</body>
+
+</html>

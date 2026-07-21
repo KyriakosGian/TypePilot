@@ -79,6 +79,8 @@ The API key, selected model, writing instructions, and Personal Dictionary are s
 
 The selected text and relevant writing settings are sent directly to Google only when TypePilot makes a Gemini API request. No TypePilot backend or third-party proxy receives them.
 
+Read the full [TypePilot Privacy Policy](PRIVACY.md).
+
 ## Credits
 
 - Created by [KyriakosGian](https://github.com/KyriakosGian)
