@@ -1,6 +1,6 @@
 # TypePilot Privacy Policy
 
-Effective date: July 21, 2026
+Effective date: July 22, 2026
 
 TypePilot is a Chrome extension that corrects and transforms text selected by the user. It uses the Google Gemini API with an API key supplied by the user.
 
@@ -8,9 +8,10 @@ TypePilot is a Chrome extension that corrects and transforms text selected by th
 
 TypePilot handles the following data only to provide its writing features:
 
-- Text that the user selects and explicitly submits through Fix, Rewrite, Translate to English, Shorten, Formal tone, or Friendly tone.
+- Text that the user selects and explicitly submits through Fix, Rewrite, Translate, Shorten, Formal tone, or Friendly tone.
 - The user's Google Gemini API key.
 - The selected Gemini model.
+- The selected translation language.
 - Custom writing instructions.
 - Personal Dictionary terms supplied by the user.
 - Gemini response text and request metadata, such as token counts, model name, response time, and cache status.
@@ -19,13 +20,13 @@ TypePilot does not collect browsing history, visited URLs, advertising identifie
 
 ## How Data Is Used
 
-The selected text, writing instructions, Personal Dictionary terms, selected model, and API key are used only to perform the writing action requested by the user.
+The selected text, writing instructions, Personal Dictionary terms, selected model, selected translation language, and API key are used only to perform the writing action requested by the user.
 
 TypePilot does not use user data for advertising, profiling, creditworthiness, or any purpose unrelated to its writing features. TypePilot does not sell user data.
 
 ## Data Storage
 
-The API key, selected model, writing instructions, and Personal Dictionary are stored locally in `chrome.storage.local` on the user's device.
+The API key, selected model, translation language, writing instructions, and Personal Dictionary are stored locally in `chrome.storage.local` on the user's device.
 
 Completed results may remain temporarily in the extension service worker's in-memory cache for up to five minutes to speed up identical repeated requests. The cache holds at most 50 results, is not written to persistent storage, and is cleared when the service worker terminates.
 
@@ -40,6 +41,7 @@ When the user explicitly starts a writing action, TypePilot sends the required r
 - Custom writing instructions.
 - Personal Dictionary terms.
 - The selected Gemini model.
+- The selected translation language when the user requests a translation.
 - The user's Gemini API key for authentication.
 
 TypePilot does not send this data to the TypePilot developer or to an intermediate proxy. Google's handling of data is governed by the applicable [Google Privacy Policy](https://policies.google.com/privacy) and Gemini API terms.
@@ -60,7 +62,7 @@ TypePilot's use and transfer of user data complies with the Chrome Web Store Use
 
 ## User Control and Deletion
 
-Users can replace their API key and edit or clear their Personal Dictionary from TypePilot Settings. Users can delete locally stored TypePilot data by clearing the extension's data in Chrome or uninstalling the extension.
+Users can replace their API key, choose a translation language, and edit or clear their Personal Dictionary from TypePilot Settings. Users can delete locally stored TypePilot data by clearing the extension's data in Chrome or uninstalling the extension.
 
 Closing the TypePilot interface cancels an active request when cancellation is still possible.
 

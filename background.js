@@ -21,6 +21,35 @@ const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_AUTOMATIC_RETRIES = 1;
 const CACHE_TTL_MS = 5 * 60_000;
 const CACHE_MAX_ENTRIES = 50;
+const DEFAULT_TRANSLATION_LANGUAGE = "en";
+
+const TRANSLATION_LANGUAGES = Object.freeze({
+  en: "English",
+  el: "Greek",
+  de: "German",
+  fr: "French",
+  es: "Spanish",
+  it: "Italian",
+  pt: "Portuguese",
+  nl: "Dutch",
+  pl: "Polish",
+  ro: "Romanian",
+  cs: "Czech",
+  sv: "Swedish",
+  da: "Danish",
+  no: "Norwegian",
+  fi: "Finnish",
+  tr: "Turkish",
+  ru: "Russian",
+  uk: "Ukrainian",
+  ar: "Arabic",
+  he: "Hebrew",
+  hi: "Hindi",
+  "zh-CN": "Chinese (Simplified)",
+  "zh-TW": "Chinese (Traditional)",
+  ja: "Japanese",
+  ko: "Korean",
+});
 
 const LEGACY_DEFAULT_SYSTEM_PROMPT =
   'Act as an expert writing assistant. Identify the language, correct spelling, grammar, and punctuation in the provided text, maintaining the original tone. Also, provide 1 alternative rewrite, and an English translation of the corrected text. Output strictly as a JSON array of 3 strings: ["Corrected text", "Alternative 1", "English Translation"]. No markdown or extra text.';
@@ -40,9 +69,7 @@ const ACTIONS = Object.freeze({
     instruction: "Rewrite the text for better clarity, flow, and natural phrasing. Keep the original language, meaning, tone, and factual details.",
   },
   translate: {
-    label: "English Translation",
     temperature: 0.2,
-    instruction: "Translate the text into natural English. Preserve its meaning, tone, formatting, names, URLs, email addresses, numbers, and factual details.",
   },
   shorten: {
     label: "Shortened",
@@ -97,7 +124,7 @@ const activeRequests = new Map();
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") return;
 
-  const relevantKeys = ["geminiApiKey", "geminiModel", "systemPrompt", "personalDictionary"];
+  const relevantKeys = ["geminiApiKey", "geminiModel", "systemPrompt", "personalDictionary", "translationLanguage"];
   if (!relevantKeys.some((key) => key in changes)) return;
 
   if (settingsCache) {
@@ -115,6 +142,7 @@ async function getSettings() {
       "geminiModel",
       "systemPrompt",
       "personalDictionary",
+      "translationLanguage",
     ]);
   }
   return settingsCache;
@@ -124,6 +152,30 @@ function normaliseSystemPrompt(value) {
   const prompt = String(value ?? "").trim();
   if (!prompt || prompt === LEGACY_DEFAULT_SYSTEM_PROMPT) return DEFAULT_SYSTEM_PROMPT;
   return prompt;
+}
+
+function normaliseTranslationLanguage(value) {
+  const languageCode = String(value ?? "").trim();
+  return Object.hasOwn(TRANSLATION_LANGUAGES, languageCode)
+    ? languageCode
+    : DEFAULT_TRANSLATION_LANGUAGE;
+}
+
+function getTranslationLanguageLabel(value) {
+  return TRANSLATION_LANGUAGES[normaliseTranslationLanguage(value)];
+}
+
+function getActionDefinition(actionId, translationLanguage) {
+  const action = ACTIONS[actionId];
+  if (!action) return null;
+  if (actionId !== "translate") return action;
+
+  const languageLabel = getTranslationLanguageLabel(translationLanguage);
+  return {
+    ...action,
+    label: `${languageLabel} Translation`,
+    instruction: `Translate the text into natural ${languageLabel}. Preserve its meaning, tone, formatting, names, URLs, email addresses, numbers, and factual details.`,
+  };
 }
 
 function buildSystemInstruction(systemPrompt, action, personalDictionary) {
@@ -302,8 +354,8 @@ function extractTextOrThrow(data) {
   return rawText;
 }
 
-function createCacheKey({ text, systemPrompt, personalDictionary, model, actionId }) {
-  return JSON.stringify([model, actionId, systemPrompt, personalDictionary, text]);
+function createCacheKey({ text, systemPrompt, personalDictionary, model, actionId, translationLanguage }) {
+  return JSON.stringify([model, actionId, translationLanguage, systemPrompt, personalDictionary, text]);
 }
 
 function getCachedResult(key) {
@@ -490,6 +542,26 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
 
+  if (message?.type === "TYPEPILOT_GET_UI_SETTINGS") {
+    getSettings()
+      .then((settings) => {
+        const translationLanguage = normaliseTranslationLanguage(settings.translationLanguage);
+        sendResponse({
+          success: true,
+          translationLanguage,
+          translationLanguageLabel: getTranslationLanguageLabel(translationLanguage),
+        });
+      })
+      .catch(() => {
+        sendResponse({
+          success: true,
+          translationLanguage: DEFAULT_TRANSLATION_LANGUAGE,
+          translationLanguageLabel: TRANSLATION_LANGUAGES[DEFAULT_TRANSLATION_LANGUAGE],
+        });
+      });
+    return true;
+  }
+
   if (message?.type !== "TYPEPILOT_PROCESS") return false;
 
   (async () => {
@@ -504,9 +576,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       const model = String(settings.geminiModel ?? DEFAULT_MODEL).trim() || DEFAULT_MODEL;
       const systemPrompt = normaliseSystemPrompt(settings.systemPrompt);
       const personalDictionary = String(settings.personalDictionary ?? "").trim();
+      const translationLanguage = normaliseTranslationLanguage(settings.translationLanguage);
       const selectedText = String(message.text ?? "");
       const actionId = String(message.action ?? "fix");
-      const action = ACTIONS[actionId];
+      const action = getActionDefinition(actionId, translationLanguage);
 
       if (!selectedText.trim()) {
         throw new TypePilotError(ERR.NO_TEXT, "No text selected.", false);
@@ -528,6 +601,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         personalDictionary,
         model,
         actionId,
+        translationLanguage,
       });
       const cached = getCachedResult(cacheKey);
       if (cached) {

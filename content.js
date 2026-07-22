@@ -15,23 +15,60 @@ let menuButton = null;
 let actionMenu = null;
 let popup = null;
 let activeRequestId = null;
+let translationLanguageLabel = "English";
 
-const SECONDARY_ACTIONS = Object.freeze([
-  { id: "rewrite", label: "Rewrite", hint: "Improve clarity and flow" },
-  { id: "translate", label: "Translate to English", hint: "Natural English translation" },
-  { id: "shorten", label: "Shorten", hint: "Make the text concise" },
-  { id: "formal", label: "Formal tone", hint: "Professional wording" },
-  { id: "friendly", label: "Friendly tone", hint: "Warm, natural wording" },
-]);
+function getSecondaryActions() {
+  return [
+    { id: "rewrite", label: "Rewrite", hint: "Improve clarity and flow" },
+    {
+      id: "translate",
+      label: `Translate to ${translationLanguageLabel}`,
+      hint: `Natural ${translationLanguageLabel} translation`,
+    },
+    { id: "shorten", label: "Shorten", hint: "Make the text concise" },
+    { id: "formal", label: "Formal tone", hint: "Professional wording" },
+    { id: "friendly", label: "Friendly tone", hint: "Warm, natural wording" },
+  ];
+}
 
 const ACTION_LABELS = Object.freeze({
   fix: "Corrected",
   rewrite: "Rewritten",
-  translate: "English Translation",
   shorten: "Shortened",
   formal: "Formal Tone",
   friendly: "Friendly Tone",
 });
+
+function getActionLabel(actionId) {
+  if (actionId === "translate") return `${translationLanguageLabel} Translation`;
+  return ACTION_LABELS[actionId];
+}
+
+function updateTranslationActionUi() {
+  const item = actionMenu?.querySelector('[data-typepilot-action="translate"]');
+  if (!item) return;
+
+  const label = item.querySelector(".typepilot-action-menu__label");
+  const hint = item.querySelector(".typepilot-action-menu__hint");
+  if (label) label.textContent = `Translate to ${translationLanguageLabel}`;
+  if (hint) hint.textContent = `Natural ${translationLanguageLabel} translation`;
+}
+
+async function refreshTranslationLanguage() {
+  if (!chrome.runtime?.id) return;
+
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "TYPEPILOT_GET_UI_SETTINGS" });
+    if (!response?.success || typeof response.translationLanguageLabel !== "string") return;
+
+    const languageLabel = response.translationLanguageLabel.trim();
+    if (!languageLabel || languageLabel.length > 40) return;
+    translationLanguageLabel = languageLabel;
+    updateTranslationActionUi();
+  } catch {
+    // The extension may have been reloaded while this page remained open.
+  }
+}
 
 function isTypePilotPath(path) {
   return path.some((node) => node?.id === "typepilot-btn" || node?.id === "typepilot-popup");
@@ -153,11 +190,12 @@ function showFloatingControl(x, y) {
   actionMenu.setAttribute("role", "menu");
   actionMenu.hidden = true;
 
-  for (const action of SECONDARY_ACTIONS) {
+  for (const action of getSecondaryActions()) {
     const item = document.createElement("button");
     item.type = "button";
     item.className = "typepilot-action-menu__item";
     item.setAttribute("role", "menuitem");
+    item.dataset.typepilotAction = action.id;
 
     const itemLabel = document.createElement("span");
     itemLabel.className = "typepilot-action-menu__label";
@@ -195,6 +233,7 @@ function showFloatingControl(x, y) {
   document.body.appendChild(floatingControl);
 
   requestAnimationFrame(clampFloatingControl);
+  void refreshTranslationLanguage();
 }
 
 function closeActionMenu() {
@@ -377,7 +416,7 @@ async function handleActionClick(actionId = "fix", explicitAnchor = null, explic
     if (response?.success && typeof response.result === "string") {
       showResultPopup(response.result, anchorX, anchorY, {
         action: response.action ?? actionId,
-        actionLabel: response.actionLabel ?? ACTION_LABELS[actionId],
+        actionLabel: response.actionLabel ?? getActionLabel(actionId),
         model: response.model,
         usage: response.usage,
         durationMs: response.durationMs,
@@ -583,7 +622,7 @@ function showResultPopup(result, x, y, meta = {}) {
   popup.setAttribute("role", "dialog");
   popup.setAttribute("aria-label", "TypePilot result");
 
-  const actionLabel = meta.actionLabel ?? ACTION_LABELS[meta.action] ?? "Result";
+  const actionLabel = meta.actionLabel ?? getActionLabel(meta.action) ?? "Result";
   const { header, infoPanel } = createPopupHeader("TypePilot", { ...meta, actionLabel });
   popup.appendChild(header);
   if (infoPanel) popup.appendChild(infoPanel);

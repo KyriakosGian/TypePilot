@@ -2,6 +2,20 @@
 
 All notable changes to TypePilot are documented here.
 
+## [1.3.0] - 2026-07-22
+
+### Added
+
+- Translation target setting with 25 supported languages and English as the default.
+- Dynamic Translate menu and result labels based on the selected target language.
+- A restricted UI-settings message so content scripts can display the language without reading protected local storage.
+
+### Changed
+
+- Translation instructions now use the configured target language.
+- Result cache keys now include the translation language.
+- Settings, documentation, privacy disclosures, website, screenshots, and release package updated for configurable translation.
+
 ## [1.2.0] - 2026-07-20
 
 ### Added

@@ -5,6 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TypePilot Store Demo</title>
+  <link rel="stylesheet" href="../style.css" />
   <style>
     * {
       box-sizing: border-box;
@@ -211,6 +212,40 @@
       </div>
     </section>
   </main>
+
+  <script>
+    window.chrome = {
+      runtime: {
+        id: "typepilot-store-demo",
+        sendMessage: async (message) => {
+          if (message?.type === "TYPEPILOT_GET_UI_SETTINGS") {
+            return {
+              success: true,
+              translationLanguage: "de",
+              translationLanguageLabel: "German",
+            };
+          }
+          return { success: false };
+        },
+      },
+    };
+  </script>
+  <script src="../content.js"></script>
+  <script>
+    if (new URLSearchParams(window.location.search).get("capture") === "actions") {
+      requestAnimationFrame(() => {
+        const paragraph = document.querySelector("#message-editor p:nth-child(2)");
+        const range = document.createRange();
+        range.selectNodeContents(paragraph);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+
+        showFloatingControl(448, 426);
+        requestAnimationFrame(() => menuButton.click());
+      });
+    }
+  </script>
 </body>
 
 </html>

@@ -22,6 +22,7 @@
       <nav class="sidebar__nav">
         <a href="#api-section" class="sidebar__nav-link sidebar__nav-link--active">API Configuration</a>
         <a href="#model-section" class="sidebar__nav-link">AI Model</a>
+        <a href="#translation-section" class="sidebar__nav-link">Translation</a>
         <a href="#prompt-section" class="sidebar__nav-link">Writing Instructions</a>
         <a href="#dictionary-section" class="sidebar__nav-link">Personal Dictionary</a>
       </nav>
@@ -32,7 +33,7 @@
           <a href="https://miniapps.gr/TypePilotAi" target="_blank" rel="noopener noreferrer">miniapps.gr/TypePilotAi</a>
           <a href="https://ProCreta.gr" target="_blank" rel="noopener noreferrer">ProCreta.gr</a>
         </div>
-        <div class="sidebar__version">v1.2.0</div>
+        <div class="sidebar__version">v1.3.0</div>
       </div>
     </aside>
 
@@ -96,6 +97,50 @@
                 <div class="field-info-box">
                   <strong>Model guide:</strong> Flash-Lite prioritizes speed and quota efficiency. Gemini 3.5 Flash prioritizes output quality. Gemini 2.5 Flash-Lite remains the compatibility fallback.
                 </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="translation-section" class="card">
+            <div class="card__icon-wrap card__icon-wrap--purple">
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm5.7 7h-2.06a12.7 12.7 0 0 0-1.2-4.03A6.03 6.03 0 0 1 15.7 9zM10 4c.72 0 1.68 1.86 1.94 5H8.06C8.32 5.86 9.28 4 10 4zM7.56 4.97A12.7 12.7 0 0 0 6.36 9H4.3a6.03 6.03 0 0 1 3.26-4.03zM4.3 11h2.06a12.7 12.7 0 0 0 1.2 4.03A6.03 6.03 0 0 1 4.3 11zM10 16c-.72 0-1.68-1.86-1.94-5h3.88c-.26 3.14-1.22 5-1.94 5zm2.44-.97A12.7 12.7 0 0 0 13.64 11h2.06a6.03 6.03 0 0 1-3.26 4.03z" />
+              </svg>
+            </div>
+            <div class="card__body">
+              <h3 class="card__title">Translation</h3>
+              <p class="card__description">Choose the target used by the Translate action. The action menu updates automatically.</p>
+
+              <div class="field-group">
+                <label class="field-label" for="translationLanguage">Target language</label>
+                <select id="translationLanguage" name="translationLanguage" class="field-select">
+                  <option value="en">English</option>
+                  <option value="el">Greek</option>
+                  <option value="de">German</option>
+                  <option value="fr">French</option>
+                  <option value="es">Spanish</option>
+                  <option value="it">Italian</option>
+                  <option value="pt">Portuguese</option>
+                  <option value="nl">Dutch</option>
+                  <option value="pl">Polish</option>
+                  <option value="ro">Romanian</option>
+                  <option value="cs">Czech</option>
+                  <option value="sv">Swedish</option>
+                  <option value="da">Danish</option>
+                  <option value="no">Norwegian</option>
+                  <option value="fi">Finnish</option>
+                  <option value="tr">Turkish</option>
+                  <option value="ru">Russian</option>
+                  <option value="uk">Ukrainian</option>
+                  <option value="ar">Arabic</option>
+                  <option value="he">Hebrew</option>
+                  <option value="hi">Hindi</option>
+                  <option value="zh-CN">Chinese (Simplified)</option>
+                  <option value="zh-TW">Chinese (Traditional)</option>
+                  <option value="ja">Japanese</option>
+                  <option value="ko">Korean</option>
+                </select>
+                <p class="field-hint">English remains the default. The selected language is stored locally and included only with translation requests.</p>
               </div>
             </div>
           </section>

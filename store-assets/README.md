@@ -1,6 +1,6 @@
 # TypePilot Chrome Web Store Assets
 
-These files are prepared for the TypePilot 1.2.0 Chrome Web Store listing.
+These files are prepared for the TypePilot 1.3.0 Chrome Web Store listing.
 
 ## Upload to the Store Listing
 

@@ -10,7 +10,7 @@ Never reuse private user context in source files, placeholders, examples, tests,
 
 TypePilot is a Chrome Extension using Manifest V3. It is a real-time AI writing assistant powered by the Google Gemini API and a Bring Your Own Key model. The extension communicates directly with Google without an intermediate backend.
 
-Current version: 1.2.0
+Current version: 1.3.0
 
 ## Development
 
@@ -26,7 +26,7 @@ All source files are plain JavaScript and CSS. `background.js` is an ES module s
 | `background.js` | Settings cache, actions, Gemini calls, structured parsing, retry, cancellation, result cache, and error mapping |
 | `content.js` | Selection detection, split Fix UI, action menu, result UI, and field replacement |
 | `style.css` | Scoped injected UI styles |
-| `options.html/js/css` | API key, model picker, writing instructions, and personal dictionary settings |
+| `options.html/js/css` | API key, model picker, translation language, writing instructions, and personal dictionary settings |
 | `CHANGELOG.md` | Version history |
 
 ## Message Flow
@@ -34,6 +34,7 @@ All source files are plain JavaScript and CSS. `background.js` is an ES module s
 ```text
 User selects editable text
   -> content.js shows the split Fix control
+  -> content.js requests the safe translation-language label through TYPEPILOT_GET_UI_SETTINGS
   -> Fix or a dropdown action sends TYPEPILOT_PROCESS with text, action, and requestId
   -> background.js reads cached settings
   -> identical recent requests return from the in-memory result cache
@@ -57,6 +58,8 @@ The primary action is always `fix`. The dropdown contains:
 - `friendly`
 
 Action labels, instructions, and temperatures are defined in `ACTIONS` in `background.js`. Each request returns one result.
+
+The `translate` action resolves its label and instruction from the validated `translationLanguage` setting. English is the fallback. Content scripts cannot read restricted local storage directly, so `TYPEPILOT_GET_UI_SETTINGS` returns only the safe language code and label.
 
 ## Selection Modes
 
@@ -84,6 +87,7 @@ Only `RATE_LIMIT`, `SERVER_ERROR`, and `NETWORK_ERROR` receive one automatic ret
 - `geminiModel`, default `gemini-2.5-flash-lite`
 - `systemPrompt`
 - `personalDictionary`
+- `translationLanguage`, default `en`
 
 The local storage area is restricted to trusted extension contexts when supported by Chromium.
 

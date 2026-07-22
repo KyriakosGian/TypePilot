@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TypePilot",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "AI writing assistant for instant corrections, rewrites, translation, shortening, and tone changes with Google Gemini.",
   "permissions": ["storage"],
   "host_permissions": [
