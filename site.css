@@ -42,6 +42,7 @@ a {
 img {
   display: block;
   max-width: 100%;
+  height: auto;
 }
 
 .shell {
@@ -307,6 +308,11 @@ img {
   background: #eef1fb;
   box-shadow: var(--shadow), 0 0 0 10px rgba(255, 255, 255, 0.025);
   transform: perspective(1500px) rotateY(-5deg) rotateX(1deg);
+}
+
+.browser-frame > img {
+  width: 100%;
+  height: auto;
 }
 
 .browser-bar {
@@ -632,8 +638,9 @@ img {
 }
 
 .shot img {
-  aspect-ratio: 16 / 10;
-  object-fit: cover;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
   border-bottom: 1px solid var(--line);
 }
 
