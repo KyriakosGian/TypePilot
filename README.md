@@ -4,6 +4,10 @@
   <img src="https://img.shields.io/badge/version-1.2.0-6c63ff?style=flat-square" alt="Version 1.2.0"/>
   <img src="https://img.shields.io/badge/manifest-v3-blue?style=flat-square" alt="Manifest V3"/>
   <img src="https://img.shields.io/badge/powered%20by-Gemini-orange?style=flat-square" alt="Powered by Gemini"/>
+  <br/><br/>
+  <a href="https://kyriakosgian.github.io/TypePilot/">Website</a> ·
+  <a href="https://github.com/KyriakosGian/TypePilot/releases/download/v1.2.0/TypePilot-v1.2.0.zip">Download v1.2.0</a> ·
+  <a href="https://github.com/KyriakosGian/TypePilot/releases">Releases</a>
 </div>
 
 TypePilot is a lightweight Manifest V3 Chrome extension that corrects and transforms selected text directly inside editable browser fields. Fix remains the one-click primary action, while the dropdown adds rewriting, English translation, shortening, and tone changes.
@@ -46,12 +50,13 @@ TypePilot uses your own Google Gemini API key and communicates directly from the
 
 ## Installation
 
-1. Download or clone this repository.
-2. Open `chrome://extensions/` in Chrome.
-3. Enable Developer mode.
-4. Select Load unpacked.
-5. Choose the TypePilot project folder.
-6. Pin TypePilot to the Chrome toolbar.
+1. Download the latest [TypePilot release](https://github.com/KyriakosGian/TypePilot/releases/latest).
+2. Extract the downloaded ZIP file.
+3. Open `chrome://extensions/` in Chrome.
+4. Enable Developer mode.
+5. Select Load unpacked.
+6. Choose the extracted TypePilot folder.
+7. Pin TypePilot to the Chrome toolbar.
 
 ## Configuration
 
@@ -84,6 +89,7 @@ Read the full [TypePilot Privacy Policy](PRIVACY.md).
 ## Credits
 
 - Created by [KyriakosGian](https://github.com/KyriakosGian)
+- Website: [kyriakosgian.github.io/TypePilot](https://kyriakosgian.github.io/TypePilot/)
 - Project page: [miniapps.gr/TypePilotAi](https://miniapps.gr/TypePilotAi)
 - Supported by [ProCreta.gr](https://procreta.gr)
 
