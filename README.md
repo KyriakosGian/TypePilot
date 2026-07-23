@@ -10,7 +10,7 @@
   <a href="https://github.com/KyriakosGian/TypePilot/releases">Releases</a>
 </div>
 
-TypePilot is a fast Chrome writing assistant that helps you write and correct text instantly with Google Gemini Free. Select text in any editable field, then fix spelling and grammar in one click or rewrite, translate, shorten, and adjust the tone.
+TypePilot is a Chrome extension that helps you write and correct text instantly with Google Gemini Free. Select text in any editable field, then fix spelling and grammar in one click or rewrite, translate, shorten, and adjust the tone.
 
 TypePilot uses your own Google Gemini API key and communicates directly from the browser to Google. There is no TypePilot backend or intermediate proxy.
 
