@@ -89,7 +89,6 @@ Read the full [TypePilot Privacy Policy](PRIVACY.md).
 
 - Created by [KyriakosGian](https://github.com/KyriakosGian)
 - Website: [kyriakosgian.github.io/TypePilot](https://kyriakosgian.github.io/TypePilot/)
-- Project page: [miniapps.gr/TypePilotAi](https://miniapps.gr/TypePilotAi)
 - Supported by [ProCreta.gr](https://procreta.gr)
 
 See [CHANGELOG.md](CHANGELOG.md) for the version history.
