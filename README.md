@@ -1,20 +1,27 @@
 <div align="center">
   <img src="./store-assets/small-promo-440x280.png" width="440" alt="TypePilot Chrome Web Store promo"/>
   <h1>TypePilot - AI Writing Assistant</h1>
-  <img src="https://img.shields.io/badge/version-1.4.0-6c63ff?style=flat-square" alt="Version 1.4.0"/>
+  <img src="https://img.shields.io/badge/version-1.4.1-6c63ff?style=flat-square" alt="Version 1.4.1"/>
   <img src="https://img.shields.io/badge/manifest-v3-blue?style=flat-square" alt="Manifest V3"/>
   <img src="https://img.shields.io/badge/powered%20by-Gemini-orange?style=flat-square" alt="Powered by Gemini"/>
   <br/><br/>
   <a href="https://kyriakosgian.github.io/TypePilot/">Website</a> ·
-  <a href="https://github.com/KyriakosGian/TypePilot/releases/download/v1.4.0/TypePilot-v1.4.0.zip">Download v1.4.0</a> ·
+  <a href="https://github.com/KyriakosGian/TypePilot/releases/download/v1.4.1/TypePilot-v1.4.1.zip">Download v1.4.1</a> ·
   <a href="https://github.com/KyriakosGian/TypePilot/releases">Releases</a>
 </div>
 
-TypePilot is a Chrome extension that helps you write and correct text instantly with Google Gemini Free. Select text in any editable field, then fix spelling and grammar in one click or rewrite, translate, shorten, and adjust the tone.
+TypePilot is a Chrome extension for correcting and improving work-related writing with Google Gemini and your own API key. Select text in a supported editable field, then fix spelling and grammar in one click or rewrite, translate, shorten, and adjust the tone.
 
 TypePilot uses your own Google Gemini API key and communicates directly from the browser to Google. There is no TypePilot backend or intermediate proxy.
 
-Google determines Gemini free-tier availability, quotas, and any charges for the model and API project you choose. See [Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing).
+The extension is free. Google API access is separate and is not guaranteed to be free. Google's current terms require users to be 18 or older, professional or business use, and supported regions. API clients made available in the EEA, Switzerland, or the UK require Paid Services, meaning an API project with an active billing account under those terms. Check the [Gemini API terms](https://ai.google.dev/gemini-api/terms), [available regions](https://ai.google.dev/gemini-api/docs/available-regions), and [pricing](https://ai.google.dev/gemini-api/docs/pricing) for your project before use.
+
+## What's New in 1.4.1
+
+- Clear separation between the free extension and Google's API costs and eligibility requirements.
+- More precise privacy disclosures for model discovery, local editor handling, and in-memory cache retention.
+- Complete Chrome Web Store listing, submission instructions, and repeatable package checks.
+- Updated Settings disclosures and screenshots. Writing actions and replacement behavior remain unchanged from 1.4.0.
 
 ## What's New in 1.4.0
 
@@ -95,6 +102,7 @@ Chrome system pages, the Chrome Web Store, closed Shadow DOM editors, and editor
 The extension remains plain JavaScript and CSS with no runtime build or dependency installation.
 
 - Run `node --test tests/regression.test.cjs` for storage, validation, timeout, cancellation, and shortcut regression tests.
+- Run `node scripts/check-store.cjs` for read-only Store listing, image, package-content, and checksum checks.
 - Run `node tests/browser.cjs` with Playwright and its Chromium available for real unpacked-extension editor tests. `TYPEPILOT_PLAYWRIGHT` can point to an existing Playwright package and `PLAYWRIGHT_BROWSERS_PATH` to its browser cache.
 - Set `TYPEPILOT_CAPTURE=1` when running the browser suite to regenerate the five neutral store screenshots after the checks pass.
 - GitHub Actions runs both the regression suite and Chromium editor checks on pushes and pull requests.
@@ -106,9 +114,18 @@ Browser tests use a temporary profile and mocked Gemini responses. They do not u
 
 The API key, selected model, translation language, writing instructions, and Personal Dictionary are stored in `chrome.storage.local`. Recovery keeps up to five original editor backups in `chrome.storage.session` until the browser session ends. Access is restricted to trusted extension contexts when supported by Chromium.
 
-The selected text and relevant writing settings are sent directly to Google only when TypePilot makes a Gemini API request. No TypePilot backend or third-party proxy receives them.
+Selected text and relevant writing settings are sent directly to Google for a user-requested writing action. Settings also sends the API key to Google for model discovery, without editor text or writing instructions. No TypePilot backend or intermediate proxy receives them. Cached results can be reused for five minutes, but expired entries can remain in service-worker memory until lookup, eviction, settings changes, or worker termination. Google's handling of API content depends on its terms and plan. Do not submit sensitive content to unpaid Gemini services.
 
 Read the full [TypePilot Privacy Policy](PRIVACY.md).
+
+## Chrome Web Store Preparation
+
+The English [listing text](store-assets/STORE-LISTING.md) and
+[submission guide](store-assets/SUBMISSION.md) cover descriptions, images,
+permission justifications, data disclosures, and private reviewer instructions.
+The guide records the remaining manual checks and Google API eligibility
+conditions. Prepared files do not mean the extension has been submitted or
+approved by the Chrome Web Store.
 
 ## Credits
 

@@ -11,6 +11,7 @@ jobs:
         with:
           node-version: '22'
       - run: node --test tests/regression.test.cjs
+      - run: node scripts/check-store.cjs
       - run: node --check content.js && node --check options.js && node --check editor-state.js
   browser:
     runs-on: ubuntu-latest

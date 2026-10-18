@@ -18,7 +18,8 @@ try {
   $hash = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash
   $checksumFile = Join-Path $releasePath 'SHA256SUMS.txt'
   $oldEntries = @(Get-Content -LiteralPath $checksumFile -ErrorAction SilentlyContinue | Where-Object { $_ -notmatch ([regex]::Escape($packageName) + '$') })
-  @($oldEntries; "$hash  $packageName") | Set-Content -LiteralPath $checksumFile -Encoding utf8
+  $checksumLines = @($oldEntries; "$hash  $packageName")
+  [System.IO.File]::WriteAllText($checksumFile, ($checksumLines -join "`n") + "`n", (New-Object System.Text.UTF8Encoding $false))
   Write-Output "$packageName $hash"
 } finally {
   if (Test-Path -LiteralPath $stagingPath) {

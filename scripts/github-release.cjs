@@ -68,6 +68,6 @@ async function api(route, method = 'GET', body) {
     if (!response.ok) throw new Error(`GitHub upload of ${filename} returned HTTP ${response.status}. The release remains a draft.`);
   }
   release = await api(`/releases/${release.id}`, 'PATCH', { draft: false, body, make_latest: 'true' });
-  await api('', 'PATCH', { description: 'TypePilot is a Chrome extension for instant writing corrections with Google Gemini Free. Fix, rewrite, translate, shorten, adjust tone, and prepare 280-character X posts. Includes Recovery backups and Copy result. Uses your own API key.', homepage: `https://${match[1].toLowerCase()}.github.io/${match[2]}/` });
+  await api('', 'PATCH', { description: 'Chrome extension for work-related writing with Google Gemini and your own API key. Fix, rewrite, translate, shorten, adjust tone, and prepare X posts. Includes Recovery and Copy result. Free extension, separate Google API costs and eligibility.', homepage: `https://${match[1].toLowerCase()}.github.io/${match[2]}/` });
   console.log(JSON.stringify({ release: release.html_url, tag, repository: `https://github.com/${repository}` }, null, 2));
 })().catch(error => { console.error(error.message); process.exitCode = 1; });

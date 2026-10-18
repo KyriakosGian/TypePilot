@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TypePilot",
-  "version": "1.4.0",
-  "description": "AI writing assistant for corrections, rewrites, translation, X posts, shortening, and tone changes with Google Gemini.",
+  "version": "1.4.1",
+  "description": "Chrome extension to fix, rewrite, translate, shorten, adjust tone, and prepare X posts with your own Google Gemini API key.",
   "permissions": ["storage"],
   "minimum_chrome_version": "112",
   "commands": {

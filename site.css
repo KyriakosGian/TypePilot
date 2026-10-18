@@ -50,6 +50,17 @@ img {
   margin-inline: auto;
 }
 
+.hero-api-note {
+  max-width: 64ch;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.hero-api-note a {
+  color: var(--cyan);
+  text-decoration: underline;
+}
+
 .skip-link {
   position: fixed;
   top: 12px;

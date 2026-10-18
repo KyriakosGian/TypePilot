@@ -2,6 +2,17 @@
 
 All notable changes to TypePilot are documented here.
 
+## [1.4.1] - 2026-10-18
+
+### Documentation and Checks
+
+- Prepared the English Chrome Web Store listing, permission justifications, data-use disclosures, and private reviewer instructions for 1.4.1.
+- Added an explicit submission checklist covering live tests, reviewer access, account-only fields, and current Google API eligibility and pricing terms.
+- Added dependency-free checks for Store metadata, image dimensions, embedded credential patterns, exact runtime ZIP contents, and SHA-256 consistency. GitHub Actions runs these checks without uploading anything.
+- Replaced unconditional free-Gemini marketing with accurate BYOK messaging and separate Google API pricing and eligibility disclosures across README, website, Settings, and GitHub About.
+- Clarified independent Settings model-discovery requests, user-provided sensitive text, connection metadata, and actual in-memory cache retention in the privacy policy.
+- Updated Settings disclosures and screenshots, and generated a separate 1.4.1 package. Writing actions and replacement logic are unchanged. The published 1.4.0 package remains intact.
+
 ## [1.4.0] - 2026-10-18
 
 ### Added

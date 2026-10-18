@@ -481,6 +481,18 @@ body {
   opacity: 1;
 }
 
+.field-disclosure {
+  color: #b8b8d2;
+  font-size: 13px;
+  line-height: 1.6;
+  opacity: 1;
+}
+
+.field-disclosure a {
+  color: #aaaaff;
+  text-decoration: underline;
+}
+
 .field-hint--error {
   color: #f87171;
   opacity: 1;

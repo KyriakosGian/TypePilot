@@ -1,6 +1,19 @@
 # TypePilot Chrome Web Store Assets
 
-These files are prepared for the TypePilot 1.4.0 Chrome Web Store listing.
+These files are prepared for the TypePilot 1.4.1 Chrome Web Store listing.
+
+## Listing text and submission guide
+
+- [STORE-LISTING.md](STORE-LISTING.md): copy-ready English description and listing fields.
+- [SUBMISSION.md](SUBMISSION.md): permission justifications, data disclosures, private reviewer instructions, upload paths, and final checklist.
+- [AUDIT.md](AUDIT.md): verified checks, resolved documentation discrepancies, and remaining manual submission gates.
+- Run `node scripts/check-store.cjs` to verify the listing metadata, image dimensions, runtime ZIP contents, and SHA-256 checksum without uploading anything.
+- Add `--online` to also check the public homepage, demo, support, privacy policy, and published package checksum. This makes public read-only HTTP requests, never a Gemini request or upload.
+
+The files are preparation material, not evidence that the dashboard has been
+filled out or the extension approved. Live API/site tests, account-only fields,
+and Google API eligibility remain explicit in the checklist. The marketing and
+privacy wording corrections are included in 1.4.1.
 
 ## Upload to the Store Listing
 
@@ -9,13 +22,13 @@ These files are prepared for the TypePilot 1.4.0 Chrome Web Store listing.
 - Marquee promo image: `marquee-1400x560.png`, 1400x560 PNG.
 - Screenshots: upload the five PNG files from `screenshots/` in numeric order. Each file is 1280x800.
 
-The screenshots show the real 1.4.0 unpacked interface, including Post for X,
+The screenshots show the real 1.4.1 unpacked interface, including Post for X,
 Copy result, and the Recovery selector. The fifth screenshot covers both
 Personal Dictionary and Recovery. All editor text and settings are fictional.
 
 ## Privacy Policy URL
 
-After `PRIVACY.md` is pushed to the public repository, use:
+Use the public policy URL in the dashboard's dedicated privacy-policy field:
 
 `https://github.com/KyriakosGian/TypePilot/blob/main/PRIVACY.md`
 

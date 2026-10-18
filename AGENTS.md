@@ -10,7 +10,7 @@ Never reuse private user context in source files, placeholders, examples, tests,
 
 TypePilot is a Chrome Extension using Manifest V3. It is a real-time AI writing assistant powered by the Google Gemini API and a Bring Your Own Key model. The extension communicates directly with Google without an intermediate backend.
 
-Current version: 1.4.0
+Current version: 1.4.1
 
 ## Development
 
@@ -33,6 +33,9 @@ All source files are plain JavaScript and CSS. `background.js` is an ES module s
 | `CHANGELOG.md` | Version history |
 | `tests/` | Dependency-free regressions and real Chromium extension tests |
 | `scripts/package.ps1` | Repeatable runtime ZIP and SHA-256 checksum generation |
+| `scripts/check-store.cjs` | Read-only Store metadata, images, privacy-pattern, ZIP, and checksum checks |
+| `store-assets/STORE-LISTING.md` | Copy-ready English Chrome Web Store description |
+| `store-assets/SUBMISSION.md` | Permission and data disclosures, reviewer instructions, and manual submission gates |
 
 ## Message Flow
 

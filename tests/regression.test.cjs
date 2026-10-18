@@ -104,3 +104,12 @@ test('Fix command targets the current tab without additional host permissions', 
   assert.equal(received.id, 9);
   assert.equal(received.message.type, 'TYPEPILOT_FIX_SELECTION');
 });
+
+test('cache reuse expires after five minutes and stale entries are deleted on lookup', () => {
+  const bg = background();
+  bg.evaluate('globalThis.testNow = 0; Date.now = () => testNow; setCachedResult("draft", { result: "sample" });');
+  assert.equal(bg.evaluate('testNow = 299999; getCachedResult("draft").result'), 'sample');
+  assert.equal(bg.evaluate('testNow = 300001; resultCache.size'), 1);
+  assert.equal(bg.evaluate('getCachedResult("draft")'), null);
+  assert.equal(bg.evaluate('resultCache.size'), 0);
+});

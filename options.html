@@ -33,7 +33,7 @@
           Created by <a href="https://github.com/KyriakosGian" target="_blank" rel="noopener noreferrer">KyriakosGian</a><br>
           <a href="https://ProCreta.gr" target="_blank" rel="noopener noreferrer">ProCreta.gr</a>
         </div>
-        <div class="sidebar__version">v1.4.0</div>
+        <div class="sidebar__version">v1.4.1</div>
       </div>
     </aside>
 
@@ -54,11 +54,12 @@
             <div class="card__body">
               <h3 class="card__title">Google Gemini API Key</h3>
               <p class="card__description">TypePilot connects directly to Google. No TypePilot server receives your key or selected text.</p>
+              <p class="field-hint field-disclosure">For adults using Gemini for professional or business purposes. Google requires Paid Services for API clients in the EEA, Switzerland, and the UK. API costs and access depend on your Google project and region. <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer">Google API terms</a></p>
 
               <div class="field-group" id="api-key-group">
                 <label class="field-label" for="geminiApiKey">
                   API Key
-                  <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" class="field-label__link">Get a free key</a>
+                  <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" class="field-label__link">Get an API key</a>
                 </label>
                 <div class="field-input-wrap">
                   <input type="password" id="geminiApiKey" name="geminiApiKey" class="field-input" placeholder="AIza..." autocomplete="off" spellcheck="false" />
@@ -72,6 +73,7 @@
                   </button>
                 </div>
                 <p class="field-hint" id="keyStatusHint">Stored locally and sent only to Google when TypePilot makes a request.</p>
+                <p class="field-hint field-disclosure">Settings sends your key to Google to discover models. Writing actions also send selected text, writing instructions, and dictionary terms. Do not send sensitive content to unpaid Gemini services. <a href="https://github.com/KyriakosGian/TypePilot/blob/main/PRIVACY.md" target="_blank" rel="noopener noreferrer">Privacy Policy</a></p>
               </div>
             </div>
           </section>

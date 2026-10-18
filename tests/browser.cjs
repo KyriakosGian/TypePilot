@@ -14,6 +14,7 @@ let worker;
 let extensionId;
 let failures = 0;
 let passed = 0;
+const modelRequests = [];
 const server = http.createServer((request, response) => {
   const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
   if (pathname === '/frame') {
@@ -84,9 +85,13 @@ async function run(name, fn) {
       channel: 'chromium', headless: true, viewport: { width: 1280, height: 800 },
       args: [`--disable-extensions-except=${root}`, `--load-extension=${root}`],
     });
-    await context.route('https://generativelanguage.googleapis.com/**', route => route.fulfill({
-      contentType: 'application/json', body: JSON.stringify({ models: [{ name: 'models/gemini-2.5-flash-lite', displayName: 'Gemini 2.5 Flash-Lite', supportedGenerationMethods: ['generateContent'] }] }),
-    }));
+    await context.route('https://generativelanguage.googleapis.com/**', route => {
+      const request = route.request();
+      modelRequests.push({ method: request.method(), body: request.postData(), hasKey: Boolean(request.headers()['x-goog-api-key']) });
+      return route.fulfill({
+        contentType: 'application/json', body: JSON.stringify({ models: [{ name: 'models/gemini-2.5-flash-lite', displayName: 'Gemini 2.5 Flash-Lite', supportedGenerationMethods: ['generateContent'] }] }),
+      });
+    });
     worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
     extensionId = new URL(worker.url()).host;
     await worker.evaluate(async () => {
@@ -218,6 +223,47 @@ async function run(name, fn) {
       await options.getByText('Recovery backups cleared.').waitFor();
       assert.equal(await options.locator('#recoveryBackup').isDisabled(), true);
       await options.close();
+    });
+
+    await run('Settings discloses API eligibility and discovers models without editor text', async () => {
+      const options = await context.newPage();
+      try {
+        modelRequests.length = 0;
+        await options.goto(`chrome-extension://${extensionId}/options.html`);
+        await options.getByText('API key accepted by Google.', { exact: true }).waitFor();
+        assert.equal(await options.getByText('For adults using Gemini', { exact: false }).isVisible(), true);
+        assert.equal(await options.getByText('Settings sends your key to Google', { exact: false }).isVisible(), true);
+        assert.equal(await options.getByRole('link', { name: 'Get an API key', exact: true }).isVisible(), true);
+        assert.ok(modelRequests.length > 0);
+        assert.ok(modelRequests.every(request => request.method === 'GET' && request.body === null && request.hasKey));
+      } finally { await options.close(); }
+    });
+
+    await run('landing page disclosures and screenshots fit desktop and mobile', async () => {
+      try {
+        for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+          await page.setViewportSize(viewport);
+          await page.goto(`http://127.0.0.1:${server.address().port}/index.html`);
+          assert.equal(await page.locator('.hero-api-note').isVisible(), true);
+          assert.match(await page.locator('.hero-api-note').innerText(), /Paid Services/);
+          const layout = await page.evaluate(() => ({ width: innerWidth, content: document.documentElement.scrollWidth }));
+          assert.ok(layout.content <= layout.width + 1, `Horizontal overflow at ${viewport.width}px`);
+          for (const picture of await page.locator('img[src*="screenshots/"]').all()) {
+            await picture.scrollIntoViewIfNeeded();
+            await picture.evaluate(element => element.decode());
+            const shape = await picture.evaluate(element => {
+              const style = getComputedStyle(element);
+              return { width: parseFloat(style.width), height: parseFloat(style.height), natural: element.naturalWidth / element.naturalHeight, fit: style.objectFit };
+            });
+            assert.ok(shape.fit !== 'fill' || Math.abs(shape.width / shape.height - shape.natural) < 0.02, 'Stretched screenshot');
+          }
+          if (process.env.TYPEPILOT_CAPTURE === '1') {
+            fs.mkdirSync(artifacts, { recursive: true });
+            await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+            await page.screenshot({ animations: 'disabled', path: path.join(artifacts, `landing-${viewport.width}.png`) });
+          }
+        }
+      } finally { await page.setViewportSize({ width: 1280, height: 800 }); }
     });
 
     if (failures) throw new Error(`${failures} browser test(s) failed`);
