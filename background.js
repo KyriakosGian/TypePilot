@@ -1,3 +1,6 @@
+import "./vendor/twitter-text.js";
+import "./x-post.js";
+
 /**
  * TypePilot background service worker.
  * Owns settings, request lifecycle, Gemini communication, caching and errors.
@@ -22,6 +25,9 @@ const MAX_AUTOMATIC_RETRIES = 1;
 const CACHE_TTL_MS = 5 * 60_000;
 const CACHE_MAX_ENTRIES = 50;
 const DEFAULT_TRANSLATION_LANGUAGE = "en";
+const REPLACEMENT_BACKUPS_KEY = "replacementBackups";
+const MAX_REPLACEMENT_BACKUPS = 5;
+const MAX_BACKUP_TEXT_LENGTH = 100_000;
 
 const TRANSLATION_LANGUAGES = Object.freeze({
   en: "English",
@@ -86,6 +92,11 @@ const ACTIONS = Object.freeze({
     temperature: 0.45,
     instruction: "Rewrite the text in a friendly, warm, and natural tone. Keep the same language, meaning, factual details, and formatting.",
   },
+  xpost: {
+    label: "Post for X",
+    temperature: 0.4,
+    instruction: "Turn the text into a polished standard X post in the same language. Correct spelling and grammar, keep the meaning and factual details, preserve every URL and @mention exactly, and add no more than two short, genuinely relevant hashtags based only on the text. Keep the result below 270 weighted characters so it safely fits the standard 280-character limit. Treat each URL as 23 characters. Return one post only, without commentary.",
+  },
 });
 
 const ERR = Object.freeze({
@@ -120,6 +131,17 @@ class TypePilotError extends Error {
 let settingsCache = null;
 const resultCache = new Map();
 const activeRequests = new Map();
+let recoveryQueue = Promise.resolve();
+
+chrome.commands.onCommand.addListener(async (command, tab) => {
+  if (command !== "fix-selection") return;
+  try {
+    const target = tab?.id != null ? tab : (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+    if (target?.id != null) await chrome.tabs.sendMessage(target.id, { type: "TYPEPILOT_FIX_SELECTION" });
+  } catch {
+    // Restricted pages and tabs not yet reloaded do not have a content script.
+  }
+});
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") return;
@@ -205,7 +227,7 @@ function parseStructuredResult(rawText) {
   try {
     parsed = JSON.parse(cleaned);
   } catch (error) {
-    console.error("[TypePilot] Structured response parse error:", error);
+    console.error("[TypePilot] Structured response parse error.");
     throw new TypePilotError(
       ERR.PARSE_ERROR,
       "The model returned an invalid response format. Try again.",
@@ -354,8 +376,8 @@ function extractTextOrThrow(data) {
   return rawText;
 }
 
-function createCacheKey({ text, systemPrompt, personalDictionary, model, actionId, translationLanguage }) {
-  return JSON.stringify([model, actionId, translationLanguage, systemPrompt, personalDictionary, text]);
+function createCacheKey({ text, systemPrompt, personalDictionary, model, actionId, translationLanguage, xContext }) {
+  return JSON.stringify([model, actionId, translationLanguage, systemPrompt, personalDictionary, text, xContext]);
 }
 
 function getCachedResult(key) {
@@ -380,6 +402,70 @@ function setCachedResult(key, value) {
     const oldestKey = resultCache.keys().next().value;
     resultCache.delete(oldestKey);
   }
+}
+
+function enqueueRecovery(operation) {
+  const task = recoveryQueue.then(operation);
+  recoveryQueue = task.catch(() => {});
+  return task;
+}
+
+async function readReplacementBackups() {
+  const stored = await chrome.storage.session.get(REPLACEMENT_BACKUPS_KEY);
+  return Array.isArray(stored[REPLACEMENT_BACKUPS_KEY]) ? stored[REPLACEMENT_BACKUPS_KEY] : [];
+}
+
+function getReplacementBackups() {
+  return enqueueRecovery(readReplacementBackups);
+}
+
+function saveReplacementBackup(message) {
+  return enqueueRecovery(async () => {
+    const selectedText = String(message.selectedText ?? "");
+    const fullText = String(message.fullText ?? "");
+    if (!selectedText.trim() || !fullText) throw new Error("No original text was supplied.");
+    if (selectedText.length > MAX_BACKUP_TEXT_LENGTH || fullText.length > MAX_BACKUP_TEXT_LENGTH) {
+      throw new Error("Recovery supports editors up to 100,000 characters. Copy the result manually for this larger editor.");
+    }
+    const backups = await readReplacementBackups();
+    backups.unshift({
+      id: crypto.randomUUID(),
+      selectedText,
+      fullText,
+      action: String(message.action ?? "fix").slice(0, 32),
+      createdAt: Date.now(),
+    });
+    const limited = backups.slice(0, MAX_REPLACEMENT_BACKUPS);
+    await chrome.storage.session.set({ [REPLACEMENT_BACKUPS_KEY]: limited });
+    return limited;
+  });
+}
+
+function isSettingsSender(sender) {
+  return sender?.id === chrome.runtime.id
+    && typeof sender.url === "string"
+    && sender.url.split(/[?#]/)[0] === chrome.runtime.getURL("options.html");
+}
+
+function requestKey(sender, requestId) {
+  return `${sender?.tab?.id ?? "extension"}:${sender?.frameId ?? 0}:${requestId}`;
+}
+
+async function processXPost(params, xContext) {
+  const check = TypePilotX.checkBudget(params.text, xContext);
+  if (!check.valid) throw new TypePilotError("X_POST_INVALID", check.reason, false);
+  let feedback = "";
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const action = {
+      ...params.action,
+      instruction: `${params.action.instruction} The selection has at most ${check.available} weighted characters available after accounting for the rest of the post. Aim for ${Math.max(1, check.available - 10)}. ${feedback}`,
+    };
+    const response = await callGeminiDirect({ ...params, action });
+    const validation = TypePilotX.validate(params.text, response.result, xContext);
+    if (validation.valid) return { ...response, result: validation.result, xWeightedLength: validation.weightedLength };
+    feedback = `The previous attempt failed validation: ${validation.reason} Correct that issue while retaining every original URL and @mention.`;
+  }
+  throw new TypePilotError("X_POST_INVALID", "The result did not safely fit X's rules. Select the whole post and try again. No text was changed.", true);
 }
 
 function waitWithSignal(delayMs, signal) {
@@ -440,66 +526,41 @@ async function callGeminiOnce({ text, systemPrompt, personalDictionary, apiKey, 
     requestController.abort();
   }, REQUEST_TIMEOUT_MS);
 
-  let response;
+  if (signal?.aborted) requestController.abort();
   try {
-    response = await fetch(url, {
+    const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify(payload),
       signal: requestController.signal,
     });
+    if (!response.ok) throw await mapHttpError(response);
+    const data = await response.json();
+    if (signal?.aborted) throw new TypePilotError(ERR.CANCELLED, "Request cancelled.", false);
+    if (timedOut) throw new TypePilotError(ERR.TIMEOUT, "The complete Gemini response timed out. Try again.", true);
+    return {
+      result: parseStructuredResult(extractTextOrThrow(data)),
+      usage: {
+        promptTokens: data?.usageMetadata?.promptTokenCount ?? null,
+        responseTokens: data?.usageMetadata?.candidatesTokenCount ?? null,
+        totalTokens: data?.usageMetadata?.totalTokenCount ?? null,
+      },
+      model,
+    };
   } catch (error) {
-    if (signal?.aborted) {
-      throw new TypePilotError(ERR.CANCELLED, "Request cancelled.", false);
-    }
+    if (signal?.aborted) throw new TypePilotError(ERR.CANCELLED, "Request cancelled.", false);
     if (timedOut || error?.name === "AbortError") {
-      throw new TypePilotError(
-        ERR.TIMEOUT,
-        `Request timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds. Try again or choose a faster model.`,
-        true,
-      );
+      throw new TypePilotError(ERR.TIMEOUT, `The complete response timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds. Try again.`, true);
     }
-    throw new TypePilotError(
-      ERR.NETWORK_ERROR,
-      "Could not reach Gemini. Check your connection and try again.",
-      true,
-    );
+    if (error instanceof TypePilotError) throw error;
+    if (error instanceof SyntaxError) {
+      throw new TypePilotError(ERR.PARSE_ERROR, "Gemini returned an invalid response envelope. Try again.", true);
+    }
+    throw new TypePilotError(ERR.NETWORK_ERROR, "Could not reach Gemini. Check your connection and try again.", true);
   } finally {
     clearTimeout(timeoutId);
     signal?.removeEventListener("abort", forwardAbort);
   }
-
-  if (signal?.aborted) {
-    throw new TypePilotError(ERR.CANCELLED, "Request cancelled.", false);
-  }
-  if (!response.ok) throw await mapHttpError(response);
-
-  let data;
-  try {
-    data = await response.json();
-  } catch {
-    throw new TypePilotError(
-      ERR.PARSE_ERROR,
-      "Gemini returned an invalid response envelope. Try again.",
-      true,
-    );
-  }
-
-  if (signal?.aborted) {
-    throw new TypePilotError(ERR.CANCELLED, "Request cancelled.", false);
-  }
-  const rawText = extractTextOrThrow(data);
-  const result = parseStructuredResult(rawText);
-  const usage = {
-    promptTokens: data?.usageMetadata?.promptTokenCount ?? null,
-    responseTokens: data?.usageMetadata?.candidatesTokenCount ?? null,
-    totalTokens: data?.usageMetadata?.totalTokenCount ?? null,
-  };
-
-  return { result, usage, model };
 }
 
 function shouldRetry(error) {
@@ -527,17 +588,19 @@ async function callGeminiDirect(params) {
   throw lastError;
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "TYPEPILOT_OPEN_SETTINGS") {
-    chrome.tabs.create({ url: chrome.runtime.getURL("options.html") });
+    const page = message.section === "recovery" ? "options.html#recovery-section" : "options.html";
+    chrome.tabs.create({ url: chrome.runtime.getURL(page) });
     sendResponse({ success: true });
     return false;
   }
 
   if (message?.type === "TYPEPILOT_CANCEL") {
-    const controller = activeRequests.get(message.requestId);
+    const key = requestKey(sender, message.requestId);
+    const controller = activeRequests.get(key);
     controller?.abort();
-    activeRequests.delete(message.requestId);
+    activeRequests.delete(key);
     sendResponse({ success: true });
     return false;
   }
@@ -562,13 +625,45 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "TYPEPILOT_SAVE_BACKUP") {
+    saveReplacementBackup(message)
+      .then((backups) => sendResponse({ success: true, count: backups.length }))
+      .catch((error) => {
+        sendResponse({ success: false, error: error?.message || "Could not save the recovery backup." });
+      });
+    return true;
+  }
+
+  if (message?.type === "TYPEPILOT_GET_BACKUPS") {
+    if (!isSettingsSender(sender)) {
+      sendResponse({ success: false, error: "Recovery is only available in TypePilot Settings." });
+      return false;
+    }
+    getReplacementBackups()
+      .then((backups) => sendResponse({ success: true, backups }))
+      .catch(() => sendResponse({ success: true, backups: [] }));
+    return true;
+  }
+
+  if (message?.type === "TYPEPILOT_CLEAR_BACKUPS") {
+    if (!isSettingsSender(sender)) {
+      sendResponse({ success: false, error: "Recovery is only available in TypePilot Settings." });
+      return false;
+    }
+    enqueueRecovery(() => chrome.storage.session.remove(REPLACEMENT_BACKUPS_KEY))
+      .then(() => sendResponse({ success: true }))
+      .catch((error) => sendResponse({ success: false, error: error?.message || "Could not clear backups." }));
+    return true;
+  }
+
   if (message?.type !== "TYPEPILOT_PROCESS") return false;
 
   (async () => {
     const requestId = String(message.requestId ?? crypto.randomUUID());
+    const key = requestKey(sender, requestId);
     const controller = new AbortController();
-    activeRequests.get(requestId)?.abort();
-    activeRequests.set(requestId, controller);
+    activeRequests.get(key)?.abort();
+    activeRequests.set(key, controller);
 
     try {
       const settings = await getSettings();
@@ -580,6 +675,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       const selectedText = String(message.text ?? "");
       const actionId = String(message.action ?? "fix");
       const action = getActionDefinition(actionId, translationLanguage);
+      const xContext = actionId === "xpost" ? {
+        prefix: String(message.xContext?.prefix ?? ""),
+        suffix: String(message.xContext?.suffix ?? ""),
+      } : undefined;
 
       if (!selectedText.trim()) {
         throw new TypePilotError(ERR.NO_TEXT, "No text selected.", false);
@@ -602,6 +701,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         model,
         actionId,
         translationLanguage,
+        xContext,
       });
       const cached = getCachedResult(cacheKey);
       if (cached) {
@@ -617,7 +717,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
 
       const startedAt = performance.now();
-      const result = await callGeminiDirect({
+      const params = {
         text: selectedText,
         systemPrompt,
         personalDictionary,
@@ -625,7 +725,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         model,
         action,
         signal: controller.signal,
-      });
+      };
+      const result = actionId === "xpost"
+        ? await processXPost(params, xContext)
+        : await callGeminiDirect(params);
       const durationMs = Math.round(performance.now() - startedAt);
 
       setCachedResult(cacheKey, result);
@@ -653,7 +756,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         retriable: typePilotError.retriable,
       });
     } finally {
-      if (activeRequests.get(requestId) === controller) activeRequests.delete(requestId);
+      if (activeRequests.get(key) === controller) activeRequests.delete(key);
     }
   })();
 

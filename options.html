@@ -25,15 +25,15 @@
         <a href="#translation-section" class="sidebar__nav-link">Translation</a>
         <a href="#prompt-section" class="sidebar__nav-link">Writing Instructions</a>
         <a href="#dictionary-section" class="sidebar__nav-link">Personal Dictionary</a>
+        <a href="#recovery-section" class="sidebar__nav-link">Recovery</a>
       </nav>
 
       <div class="sidebar__footer">
         <div class="sidebar__credits">
           Created by <a href="https://github.com/KyriakosGian" target="_blank" rel="noopener noreferrer">KyriakosGian</a><br>
-          <a href="https://miniapps.gr/TypePilotAi" target="_blank" rel="noopener noreferrer">miniapps.gr/TypePilotAi</a>
           <a href="https://ProCreta.gr" target="_blank" rel="noopener noreferrer">ProCreta.gr</a>
         </div>
-        <div class="sidebar__version">v1.3.0</div>
+        <div class="sidebar__version">v1.4.0</div>
       </div>
     </aside>
 
@@ -181,6 +181,30 @@
                 <textarea id="personalDictionary" name="personalDictionary" class="field-textarea field-textarea--compact" rows="5" placeholder="ExampleBrand&#10;ProductCode-123&#10;TechnicalTerm" spellcheck="false"></textarea>
                 <p class="field-hint">Enter one term per line. The list stays on this device and is sent to Gemini only with a writing request.</p>
               </div>
+            </div>
+          </section>
+
+          <section id="recovery-section" class="card">
+            <div class="card__icon-wrap card__icon-wrap--blue">
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path d="M10 2a8 8 0 1 0 7.75 10h-2.08A6 6 0 1 1 14.9 6.1L12 9h6V3l-1.68 1.68A7.96 7.96 0 0 0 10 2z" />
+              </svg>
+            </div>
+            <div class="card__body">
+              <h3 class="card__title">Recovery</h3>
+              <p class="card__description">Choose any of your five most recent original texts. Backups stay on this device for the browser session. Editors over 100,000 characters use manual copying instead of replacement.</p>
+              <div class="field-group">
+                <label class="field-label" for="recoveryBackup">Original backup</label>
+                <select id="recoveryBackup" class="field-select" disabled>
+                  <option>No recovery backups</option>
+                </select>
+              </div>
+              <div class="recovery-actions">
+                <button type="button" id="copyLatestBackup" class="btn-secondary">Copy Original</button>
+                <button type="button" id="clearBackups" class="btn-text">Clear Backups</button>
+              </div>
+              <p class="field-hint" id="recoveryStatus" role="status" aria-live="polite">No recovery backups are available.</p>
+              <p class="field-hint">Fix shortcut: Ctrl+Shift+Y on Windows/Linux, Command+Shift+Y on Mac. Change it at chrome://extensions/shortcuts if another extension uses it.</p>
             </div>
           </section>
 

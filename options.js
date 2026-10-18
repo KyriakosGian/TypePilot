@@ -44,12 +44,18 @@ const resetPromptButton = document.getElementById("resetPrompt");
 const toggleKeyButton = document.getElementById("toggleKeyVisibility");
 const eyeIconShow = document.getElementById("eye-icon-show");
 const eyeIconHide = document.getElementById("eye-icon-hide");
+const copyLatestBackupButton = document.getElementById("copyLatestBackup");
+const clearBackupsButton = document.getElementById("clearBackups");
+const recoveryStatus = document.getElementById("recoveryStatus");
+const recoveryBackupSelect = document.getElementById("recoveryBackup");
+let recoveryBackups = [];
 
 let keyDebounceTimer = null;
 let modelFetchController = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
   populateModelSelect(FALLBACK_MODELS, DEFAULT_MODEL);
+  await refreshRecoveryStatus();
 
   try {
     const settings = await chrome.storage.local.get([
@@ -80,6 +86,84 @@ document.addEventListener("DOMContentLoaded", async () => {
     systemPromptInput.value = DEFAULT_SYSTEM_PROMPT;
     console.warn("[TypePilot] Could not load settings:", error?.message);
   }
+});
+
+async function getRecoveryBackups() {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "TYPEPILOT_GET_BACKUPS" });
+    return response?.success && Array.isArray(response.backups) ? response.backups : [];
+  } catch {
+    return [];
+  }
+}
+
+async function refreshRecoveryStatus(message = "") {
+  const backups = await getRecoveryBackups();
+  recoveryBackups = backups;
+  const selectedId = recoveryBackupSelect.value;
+  recoveryBackupSelect.replaceChildren();
+  for (const backup of backups) {
+    const option = document.createElement("option");
+    option.value = backup.id;
+    const time = new Date(backup.createdAt).toLocaleString();
+    option.textContent = `${time} · ${backup.action} · ${String(backup.fullText).slice(0, 45).replace(/\s+/g, " ")}`;
+    recoveryBackupSelect.appendChild(option);
+  }
+  if (backups.some((backup) => backup.id === selectedId)) recoveryBackupSelect.value = selectedId;
+  const hasBackups = backups.length > 0;
+  recoveryBackupSelect.disabled = !hasBackups;
+  copyLatestBackupButton.disabled = !hasBackups;
+  clearBackupsButton.disabled = !hasBackups;
+  recoveryStatus.textContent = message || (hasBackups
+    ? `${backups.length} temporary backup${backups.length === 1 ? "" : "s"} available.`
+    : "No recovery backups are available.");
+  return backups;
+}
+
+async function copyTextToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand("copy");
+    textarea.remove();
+    return copied;
+  }
+}
+
+copyLatestBackupButton.addEventListener("click", async () => {
+  const selected = recoveryBackups.find((backup) => backup.id === recoveryBackupSelect.value);
+  const text = String(selected?.fullText || selected?.selectedText || "");
+  if (!text) {
+    await refreshRecoveryStatus("No recovery backup is available.");
+    return;
+  }
+
+  const copied = await copyTextToClipboard(text);
+  await refreshRecoveryStatus(copied
+    ? "Selected original text copied to the clipboard."
+    : "Could not copy the backup to the clipboard.");
+});
+
+clearBackupsButton.addEventListener("click", async () => {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "TYPEPILOT_CLEAR_BACKUPS" });
+    if (!response?.success) throw new Error("Recovery could not be cleared.");
+    await refreshRecoveryStatus("Recovery backups cleared.");
+  } catch {
+    recoveryStatus.textContent = "Could not clear recovery backups.";
+  }
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "session" && changes.replacementBackups) void refreshRecoveryStatus();
 });
 
 function isCompatibleTextModelId(modelId) {

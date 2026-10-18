@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#090b24">
-  <meta name="description" content="TypePilot is a Chrome extension that helps you write and correct text instantly with Google Gemini Free. Fix grammar, rewrite, translate, shorten, and adjust tone in one click.">
+  <meta name="description" content="TypePilot is a Chrome extension that helps you write and correct text instantly with Google Gemini Free. Fix grammar, create X posts, rewrite, translate, shorten, and adjust tone.">
   <meta property="og:type" content="website">
   <meta property="og:title" content="TypePilot | AI writing assistance where you type">
-  <meta property="og:description" content="TypePilot is a Chrome extension that helps you write and correct text instantly with Google Gemini Free. Fix grammar, rewrite, translate, shorten, and adjust tone in one click.">
+  <meta property="og:description" content="TypePilot is a Chrome extension that helps you write and correct text instantly with Google Gemini Free. Create X posts, rewrite, translate, shorten, and recover original text.">
   <meta property="og:url" content="https://kyriakosgian.github.io/TypePilot/">
   <meta property="og:image" content="https://kyriakosgian.github.io/TypePilot/store-assets/marquee-1400x560.png">
   <meta property="og:image:width" content="1400">
@@ -25,9 +25,9 @@
     "name": "TypePilot",
     "applicationCategory": "BrowserApplication",
     "operatingSystem": "Chrome",
-    "softwareVersion": "1.3.0",
-    "description": "TypePilot is a Chrome extension that helps you write and correct text instantly with Google Gemini Free. Fix grammar, rewrite, translate, shorten, and adjust tone.",
-    "downloadUrl": "https://github.com/KyriakosGian/TypePilot/releases/download/v1.3.0/TypePilot-v1.3.0.zip",
+    "softwareVersion": "1.4.0",
+    "description": "TypePilot is a Chrome extension that helps you write and correct text instantly with Google Gemini Free. Fix grammar, create X posts, rewrite, translate, shorten, and recover original text.",
+    "downloadUrl": "https://github.com/KyriakosGian/TypePilot/releases/download/v1.4.0/TypePilot-v1.4.0.zip",
     "codeRepository": "https://github.com/KyriakosGian/TypePilot",
     "license": "https://github.com/KyriakosGian/TypePilot/blob/main/LICENSE",
     "offers": {
@@ -65,9 +65,9 @@
         <div class="hero-copy">
           <div class="eyebrow"><span></span> Free Chrome extension · Bring your own key</div>
           <h1>Write and correct text, <span>instantly.</span></h1>
-          <p class="hero-lead">TypePilot is a Chrome extension that helps you write and correct text instantly with Google Gemini Free. Select text anywhere you type, then fix spelling and grammar in one click or choose another writing action.</p>
+          <p class="hero-lead">TypePilot is a Chrome extension that helps you write and correct text instantly with Google Gemini Free. Fix spelling and grammar, prepare a 280-character X post, and keep original text available in Recovery.</p>
           <div class="hero-actions">
-            <a class="button button-primary" href="https://github.com/KyriakosGian/TypePilot/releases/download/v1.3.0/TypePilot-v1.3.0.zip">Download v1.3.0</a>
+            <a class="button button-primary" href="https://github.com/KyriakosGian/TypePilot/releases/download/v1.4.0/TypePilot-v1.4.0.zip">Download v1.4.0</a>
             <a class="button button-ghost" href="#how-it-works">See how it works</a>
           </div>
           <ul class="trust-list" aria-label="Product highlights">
@@ -102,14 +102,14 @@
         <article><span>01</span><div><strong>Fast by design</strong><p>One focused result per request.</p></div></article>
         <article><span>02</span><div><strong>Works in context</strong><p>Use it inside editable browser fields.</p></div></article>
         <article><span>03</span><div><strong>Your Gemini key</strong><p>Direct requests with no proxy.</p></div></article>
-        <article><span>04</span><div><strong>Your terminology</strong><p>Protect terms with Personal Dictionary.</p></div></article>
+        <article><span>04</span><div><strong>Recovery protection</strong><p>Keep temporary copies before replacement.</p></div></article>
       </div>
     </section>
 
     <section class="section" id="features">
       <div class="shell">
         <div class="section-heading">
-          <p class="kicker">Six focused actions</p>
+          <p class="kicker">Seven focused actions</p>
           <h2>From rough text to ready text.</h2>
           <p>Keep Fix one click away. Open the compact menu when you need a different transformation.</p>
         </div>
@@ -136,6 +136,11 @@
             <p>Reduce the length while keeping the essential information.</p>
           </article>
           <article class="action-card">
+            <div class="action-icon">X</div>
+            <h3>Post for X</h3>
+            <p>Fit the standard 280-character limit, preserve links and mentions, and add up to two relevant hashtags.</p>
+          </article>
+          <article class="action-card">
             <div class="action-icon">◆</div>
             <h3>Formal tone</h3>
             <p>Rewrite the text in a clear, professional, and composed style.</p>
@@ -158,9 +163,9 @@
           <a class="text-link" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Create a Gemini API key <span>→</span></a>
         </div>
         <ol class="steps">
-          <li><span>1</span><div><h3>Select your text</h3><p>Highlight text inside an input, textarea, contenteditable editor, or supported Shadow DOM field.</p></div></li>
-          <li><span>2</span><div><h3>Choose an action</h3><p>Click Fix immediately or open the arrow to choose another writing action.</p></div></li>
-          <li><span>3</span><div><h3>Apply the result</h3><p>Review the focused response and click it to replace the original selection.</p></div></li>
+          <li><span>1</span><div><h3>Select your text</h3><p>Highlight text with the pointer or keyboard inside a supported editable field.</p></div></li>
+          <li><span>2</span><div><h3>Choose an action</h3><p>Click Fix, press Ctrl+Shift+Y (Command+Shift+Y on Mac), or open the menu for another action.</p></div></li>
+          <li><span>3</span><div><h3>Apply or copy</h3><p>TypePilot checks that your original draft is unchanged before replacement. Use Copy result for manual pasting and Recovery to retrieve any of your five recent originals.</p></div></li>
         </ol>
       </div>
     </section>
@@ -179,15 +184,15 @@
           </a>
           <a class="shot" href="store-assets/screenshots/03-result-1280x800.png" target="_blank">
             <img src="store-assets/screenshots/03-result-1280x800.png" alt="TypePilot rewritten result panel" loading="lazy" width="1280" height="800">
-            <span><strong>Focused result</strong>Review and replace in one click.</span>
+            <span><strong>Focused result</strong>Review, replace, or copy for manual pasting.</span>
           </a>
           <a class="shot" href="store-assets/screenshots/04-settings-1280x800.png" target="_blank">
             <img src="store-assets/screenshots/04-settings-1280x800.png" alt="TypePilot settings page" loading="lazy" width="1280" height="800">
             <span><strong>Flexible settings</strong>Choose your key, model, and instructions.</span>
           </a>
           <a class="shot shot-wide" href="store-assets/screenshots/05-personal-dictionary-1280x800.png" target="_blank">
-            <img src="store-assets/screenshots/05-personal-dictionary-1280x800.png" alt="TypePilot Personal Dictionary settings" loading="lazy" width="1280" height="800">
-            <span><strong>Personal Dictionary</strong>Protect names, brands, codes, and specialist terms.</span>
+            <img src="store-assets/screenshots/05-personal-dictionary-1280x800.png" alt="TypePilot Personal Dictionary and Recovery settings" loading="lazy" width="1280" height="800">
+            <span><strong>Dictionary and Recovery</strong>Protect specialist terms and retrieve original drafts.</span>
           </a>
         </div>
       </div>
@@ -201,6 +206,7 @@
           <p>TypePilot uses a Bring Your Own Key model. Your selected text and relevant writing settings travel directly from Chrome to the Google Gemini API only when you request an action.</p>
           <ul>
             <li>API key and settings stored locally in Chrome.</li>
+            <li>Up to five Recovery backups stored only for the browser session.</li>
             <li>No TypePilot account, analytics, or remote database.</li>
             <li>No advertising, profiling, or sale of user data.</li>
           </ul>
@@ -228,10 +234,10 @@
         <div>
           <p class="kicker">Get started</p>
           <h2>Install TypePilot in a few minutes.</h2>
-          <p>Download the latest package, load the extracted folder in Chrome, and add your free Gemini API key.</p>
+          <p>Download the latest package, load the extracted folder in Chrome, and add your Gemini API key. Google's selected model and API plan determine free-tier quotas or charges.</p>
         </div>
         <div class="install-actions">
-          <a class="button button-light" href="https://github.com/KyriakosGian/TypePilot/releases/download/v1.3.0/TypePilot-v1.3.0.zip">Download TypePilot</a>
+          <a class="button button-light" href="https://github.com/KyriakosGian/TypePilot/releases/download/v1.4.0/TypePilot-v1.4.0.zip">Download TypePilot</a>
           <a class="button button-transparent" href="https://github.com/KyriakosGian/TypePilot#installation" target="_blank" rel="noopener">Installation guide</a>
         </div>
       </div>
@@ -251,7 +257,7 @@
         <a href="https://github.com/KyriakosGian/TypePilot/blob/main/PRIVACY.md" target="_blank" rel="noopener">Privacy</a>
         <a href="https://github.com/KyriakosGian/TypePilot/issues" target="_blank" rel="noopener">Support</a>
       </div>
-      <p class="copyright">TypePilot v1.3.0 · MIT License</p>
+      <p class="copyright">TypePilot v1.4.0 · MIT License</p>
     </div>
   </footer>
 </body>

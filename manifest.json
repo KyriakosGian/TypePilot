@@ -1,9 +1,16 @@
 {
   "manifest_version": 3,
   "name": "TypePilot",
-  "version": "1.3.0",
-  "description": "AI writing assistant for instant corrections, rewrites, translation, shortening, and tone changes with Google Gemini.",
+  "version": "1.4.0",
+  "description": "AI writing assistant for corrections, rewrites, translation, X posts, shortening, and tone changes with Google Gemini.",
   "permissions": ["storage"],
+  "minimum_chrome_version": "112",
+  "commands": {
+    "fix-selection": {
+      "suggested_key": { "default": "Ctrl+Shift+Y", "mac": "Command+Shift+Y" },
+      "description": "Fix selected text with TypePilot"
+    }
+  },
   "host_permissions": [
     "https://generativelanguage.googleapis.com/*"
   ],
@@ -14,9 +21,11 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "js": ["vendor/twitter-text.js", "x-post.js", "editor-state.js", "content.js"],
       "css": ["style.css"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true,
+      "match_about_blank": true
     }
   ],
   "options_ui": {

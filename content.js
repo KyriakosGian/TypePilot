@@ -8,6 +8,10 @@ let activeElement = null;
 let activeMode = "native";
 let savedSelection = { start: 0, end: 0 };
 let savedRange = null;
+let selectionCheckTimer = null;
+let isReplacingText = false;
+let selectionSnapshot = null;
+let isCopyingText = false;
 
 let floatingControl = null;
 let primaryButton = null;
@@ -26,6 +30,7 @@ function getSecondaryActions() {
       hint: `Natural ${translationLanguageLabel} translation`,
     },
     { id: "shorten", label: "Shorten", hint: "Make the text concise" },
+    { id: "xpost", label: "Post for X", hint: "Fit 280 characters with hashtags" },
     { id: "formal", label: "Formal tone", hint: "Professional wording" },
     { id: "friendly", label: "Friendly tone", hint: "Warm, natural wording" },
   ];
@@ -35,6 +40,7 @@ const ACTION_LABELS = Object.freeze({
   fix: "Corrected",
   rewrite: "Rewritten",
   shorten: "Shortened",
+  xpost: "Post for X",
   formal: "Formal Tone",
   friendly: "Friendly Tone",
 });
@@ -108,18 +114,28 @@ function removeAllUI({ cancelRequest = true } = {}) {
 }
 
 function isNativeField(element) {
-  if (!element) return false;
+  if (!element || element.disabled || element.readOnly) return false;
   if (element.tagName === "TEXTAREA") return true;
-  return element.tagName === "INPUT" && /^(text|search|url|email)$/i.test(element.type ?? "text");
+  return element.tagName === "INPUT" && /^(text|search|url|tel)$/i.test(element.type ?? "text");
 }
 
 function getContentEditableRoot(element) {
   if (!element?.closest) return null;
-  return element.closest('[contenteditable="true"], [contenteditable=""]') ?? null;
+  const declaredRoot = element.closest("[contenteditable]");
+  if (declaredRoot) {
+    return declaredRoot.getAttribute("contenteditable") === "false" ? null : declaredRoot;
+  }
+  if (!element.isContentEditable) return null;
+
+  let root = element;
+  while (root.parentElement?.isContentEditable) root = root.parentElement;
+  return root;
 }
 
-function isEditableField(element) {
-  return isNativeField(element) || Boolean(getContentEditableRoot(element));
+function getDeepActiveElement() {
+  let element = document.activeElement;
+  while (element?.shadowRoot?.activeElement) element = element.shadowRoot.activeElement;
+  return element;
 }
 
 document.addEventListener("focusin", (event) => {
@@ -153,6 +169,7 @@ function showFloatingControl(x, y) {
 
   floatingControl = document.createElement("div");
   floatingControl.id = "typepilot-btn";
+  floatingControl.addEventListener("mousedown", (event) => event.preventDefault());
   floatingControl.className = "typepilot-split";
   floatingControl.setAttribute("role", "group");
   floatingControl.setAttribute("aria-label", "TypePilot writing actions");
@@ -285,59 +302,91 @@ function setControlLoading(isLoading) {
   closeActionMenu();
 }
 
-document.addEventListener("mouseup", (event) => {
-  const path = event.composedPath?.() ?? [];
-  if (isTypePilotPath(path)) return;
+function isTypePilotFocused() {
+  const focused = document.activeElement;
+  return Boolean(focused?.closest?.("#typepilot-btn, #typepilot-popup"));
+}
 
-  const pathNativeField = path.find((node) => isNativeField(node));
+function getSelectionAnchor(selection, fallbackElement = activeElement) {
+  if (selection?.rangeCount) {
+    const rect = selection.getRangeAt(0).getBoundingClientRect();
+    if (rect.width || rect.height) return { x: rect.right, y: rect.bottom };
+  }
+  const rect = fallbackElement?.getBoundingClientRect?.();
+  if (rect) return { x: Math.min(rect.right, window.innerWidth - 24), y: rect.bottom };
+  return { x: 20, y: 20 };
+}
+
+function inspectCurrentSelection(anchor = null, pathNativeField = null) {
+  if (isReplacingText || isCopyingText || activeRequestId || isTypePilotFocused() || popup) return;
+  if (actionMenu && !actionMenu.hidden) return;
+
   if (pathNativeField) {
     activeElement = pathNativeField;
     activeMode = "native";
   }
 
-  const wasInActiveNative =
-    activeMode === "native" &&
-    activeElement &&
-    isNativeField(activeElement) &&
-    path.includes(activeElement);
-
-  setTimeout(() => {
-    if (wasInActiveNative) {
-      const start = activeElement.selectionStart ?? 0;
-      const end = activeElement.selectionEnd ?? 0;
-      const selectedText = activeElement.value.slice(start, end).trim();
-
-      if (selectedText.length >= 2) {
-        savedSelection = { start, end };
-        savedRange = null;
-        showFloatingControl(event.clientX, event.clientY);
-      } else {
-        removeAllUI();
-      }
-      return;
-    }
-
-    const selection = window.getSelection();
-    let target = selection?.anchorNode;
-    if (target && target.nodeType !== Node.ELEMENT_NODE) target = target.parentElement;
-
-    const editableRoot = getContentEditableRoot(target);
-    if (!target || !isEditableField(target) || !editableRoot) {
+  if (activeMode === "native" && activeElement === getDeepActiveElement() && isNativeField(activeElement)) {
+    const start = activeElement.selectionStart ?? 0;
+    const end = activeElement.selectionEnd ?? 0;
+    const selectedText = activeElement.value.slice(start, end).trim();
+    if (selectedText.length < 2) {
       removeAllUI();
       return;
     }
 
-    const selectedText = selection?.rangeCount ? selection.toString().trim() : "";
-    if (selectedText.length >= 2) {
-      activeElement = editableRoot;
-      activeMode = "contenteditable";
-      savedRange = selection.getRangeAt(0).cloneRange();
-      savedSelection = { start: 0, end: 0 };
-      showFloatingControl(event.clientX, event.clientY);
-    } else {
-      removeAllUI();
-    }
-  }, 10);
+    if (floatingControl && selectionSnapshot?.element === activeElement
+      && selectionSnapshot.start === start && selectionSnapshot.end === end
+      && TypePilotEditor.isCurrent(selectionSnapshot)) return;
+    savedSelection = { start, end };
+    savedRange = null;
+    selectionSnapshot = TypePilotEditor.capture(activeElement, "native", savedSelection);
+    const position = anchor ?? getSelectionAnchor(null, activeElement);
+    showFloatingControl(position.x, position.y);
+    return;
+  }
+
+  const selection = window.getSelection();
+  let target = selection?.anchorNode;
+  if (target && target.nodeType !== Node.ELEMENT_NODE) target = target.parentElement;
+  const editableRoot = getContentEditableRoot(target);
+  const selectedText = selection?.rangeCount ? selection.toString().trim() : "";
+  if (!editableRoot || selectedText.length < 2) {
+    removeAllUI();
+    return;
+  }
+
+  const nextSnapshot = TypePilotEditor.capture(editableRoot, "contenteditable", selection.getRangeAt(0));
+  if (floatingControl && nextSnapshot && selectionSnapshot?.element === editableRoot
+    && selectionSnapshot.start === nextSnapshot.start && selectionSnapshot.end === nextSnapshot.end
+    && TypePilotEditor.isCurrent(selectionSnapshot)) return;
+  activeElement = editableRoot;
+  activeMode = "contenteditable";
+  savedRange = selection.getRangeAt(0).cloneRange();
+  selectionSnapshot = nextSnapshot;
+  if (!selectionSnapshot) return;
+  savedSelection = { start: 0, end: 0 };
+  const position = anchor ?? getSelectionAnchor(selection, editableRoot);
+  showFloatingControl(position.x, position.y);
+}
+
+function scheduleSelectionInspection(anchor = null, pathNativeField = null) {
+  clearTimeout(selectionCheckTimer);
+  selectionCheckTimer = setTimeout(() => {
+    selectionCheckTimer = null;
+    inspectCurrentSelection(anchor, pathNativeField);
+  }, 30);
+}
+
+document.addEventListener("pointerup", (event) => {
+  const path = event.composedPath?.() ?? [];
+  if (isTypePilotPath(path)) return;
+  const pathNativeField = path.find((node) => isNativeField(node)) ?? null;
+  scheduleSelectionInspection({ x: event.clientX, y: event.clientY }, pathNativeField);
+}, true);
+
+document.addEventListener("selectionchange", () => {
+  scheduleSelectionInspection();
 });
 
 document.addEventListener("mousedown", (event) => {
@@ -355,11 +404,15 @@ document.addEventListener("keydown", (event) => {
   removeAllUI();
 });
 
+document.addEventListener("keyup", (event) => {
+  if (event.key === "Escape" || isTypePilotPath(event.composedPath?.() ?? [])) return;
+  const path = event.composedPath?.() ?? [];
+  const pathNativeField = path.find((node) => isNativeField(node)) ?? null;
+  scheduleSelectionInspection(null, pathNativeField);
+}, true);
+
 function getSelectedText() {
-  if (activeMode === "native" && activeElement) {
-    return activeElement.value.slice(savedSelection.start, savedSelection.end);
-  }
-  return savedRange?.toString() ?? "";
+  return selectionSnapshot?.selectedText ?? "";
 }
 
 function createRequestId() {
@@ -367,8 +420,24 @@ function createRequestId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-async function handleActionClick(actionId = "fix", explicitAnchor = null, explicitText = null) {
-  const selectedText = explicitText ?? getSelectedText();
+try {
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type !== "TYPEPILOT_FIX_SELECTION" || !document.hasFocus()) return false;
+    const focused = getDeepActiveElement();
+    if (!isNativeField(focused) && !getContentEditableRoot(focused)) return false;
+    removeAllUI();
+    inspectCurrentSelection(null, isNativeField(focused) ? focused : null);
+    if (!selectionSnapshot?.selectedText.trim() || !floatingControl) return false;
+    void handleActionClick("fix");
+    sendResponse({ success: true });
+    return false;
+  });
+} catch {
+  // A reloaded extension requires the existing page to be reloaded as well.
+}
+
+async function handleActionClick(actionId = "fix", explicitAnchor = null, explicitText = null, snapshot = selectionSnapshot) {
+  const selectedText = explicitText ?? snapshot?.selectedText ?? "";
   if (!selectedText.trim()) {
     removeAllUI();
     return;
@@ -395,7 +464,7 @@ async function handleActionClick(actionId = "fix", explicitAnchor = null, explic
       code: "CONTEXT_INVALIDATED",
       message: "TypePilot was updated. Reload this page to continue.",
       retriable: false,
-    }, anchorX, anchorY, { text: selectedText, actionId });
+    }, anchorX, anchorY, { text: selectedText, actionId, snapshot });
     return;
   }
 
@@ -408,6 +477,10 @@ async function handleActionClick(actionId = "fix", explicitAnchor = null, explic
       requestId,
       action: actionId,
       text: selectedText,
+      xContext: actionId === "xpost" && snapshot ? {
+        prefix: snapshot.fullText.slice(0, snapshot.start),
+        suffix: snapshot.fullText.slice(snapshot.end),
+      } : undefined,
     });
 
     if (activeRequestId !== requestId) return;
@@ -421,6 +494,8 @@ async function handleActionClick(actionId = "fix", explicitAnchor = null, explic
         usage: response.usage,
         durationMs: response.durationMs,
         cached: response.cached,
+        xWeightedLength: response.xWeightedLength,
+        snapshot,
       });
       return;
     }
@@ -430,7 +505,7 @@ async function handleActionClick(actionId = "fix", explicitAnchor = null, explic
       code: response?.code ?? "UNKNOWN",
       message: response?.error ?? "Unknown error.",
       retriable: response?.retriable ?? false,
-    }, anchorX, anchorY, { text: selectedText, actionId });
+    }, anchorX, anchorY, { text: selectedText, actionId, snapshot });
   } catch (error) {
     if (activeRequestId !== requestId) return;
     activeRequestId = null;
@@ -442,7 +517,7 @@ async function handleActionClick(actionId = "fix", explicitAnchor = null, explic
         ? "TypePilot was updated. Reload this page to continue."
         : (error?.message || "Could not reach the TypePilot service worker."),
       retriable: !isContextError,
-    }, anchorX, anchorY, { text: selectedText, actionId });
+    }, anchorX, anchorY, { text: selectedText, actionId, snapshot });
   }
 }
 
@@ -456,73 +531,151 @@ function setNativeFieldValue(element, value) {
   else element.value = value;
 }
 
-function replaceSelectedText(replacement) {
-  if (activeMode === "native" && activeElement) {
-    const { start, end } = savedSelection;
-    const original = activeElement.value;
-    const nextValue = original.slice(0, start) + replacement + original.slice(end);
+async function saveReplacementBackup(snapshot, action) {
+  if (!chrome.runtime?.id) throw new Error("TypePilot was updated. Reload this page to continue.");
+  const response = await chrome.runtime.sendMessage({
+    type: "TYPEPILOT_SAVE_BACKUP",
+    selectedText: snapshot.selectedText,
+    fullText: snapshot.fullText,
+    action,
+  });
+  if (!response?.success) throw new Error(response?.error || "Could not create a Recovery copy. Use Copy result instead.");
+}
 
-    const beforeInput = new InputEvent("beforeinput", {
-      bubbles: true,
-      cancelable: true,
-      inputType: "insertReplacementText",
-      data: replacement,
-    });
-    if (!activeElement.dispatchEvent(beforeInput)) return;
+function dispatchNativeInput(element, text) {
+  element.dispatchEvent(new InputEvent("input", {
+    bubbles: true, composed: true, inputType: "insertReplacementText", data: text,
+  }));
+}
 
-    setNativeFieldValue(activeElement, nextValue);
-    const newCursor = start + replacement.length;
-    activeElement.setSelectionRange(newCursor, newCursor);
-    activeElement.focus();
-    activeElement.dispatchEvent(new InputEvent("input", {
-      bubbles: true,
-      inputType: "insertReplacementText",
-      data: replacement,
-    }));
-    activeElement.dispatchEvent(new Event("change", { bubbles: true }));
-  } else if (savedRange) {
-    try {
-      activeElement?.focus();
+function restoreOriginal(snapshot) {
+  const { element, mode, fullText } = snapshot;
+  if (!element.isConnected) return false;
+  try {
+    if (mode === "native") {
+      setNativeFieldValue(element, fullText);
+      dispatchNativeInput(element, fullText);
+    } else {
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      element.focus({ preventScroll: true });
+      selection.removeAllRanges();
+      selection.addRange(range);
+      document.execCommand("insertText", false, fullText);
+    }
+    return TypePilotEditor.read(element, mode) === fullText;
+  } catch {
+    return false;
+  }
+}
+
+async function replaceSelectedText(replacement, meta = {}) {
+  if (isReplacingText) return;
+  const snapshot = meta.snapshot;
+  const rect = popup?.getBoundingClientRect();
+  const x = rect?.left ?? 20;
+  const y = rect?.top ?? 20;
+  isReplacingText = true;
+  let userEdited = false;
+  let performingInsertion = false;
+  const recordUserInput = (event) => {
+    if (event.isTrusted && !performingInsertion) userEdited = true;
+  };
+  try {
+    if (!snapshot) throw new Error("Select the original text again. You can still copy this result.");
+    // Preserve the request's original text even if a reactive editor removed its node.
+    await saveReplacementBackup(snapshot, meta.action ?? "fix");
+    if (!TypePilotEditor.isCurrent(snapshot)) {
+      throw new Error("The editor changed after this request. No text was replaced. Copy the result or select the new text again.");
+    }
+    const { element, mode } = snapshot;
+    const nextText = TypePilotEditor.expected(snapshot, replacement);
+    if (meta.action === "xpost") {
+      const check = TypePilotX.validate(snapshot.selectedText, replacement, {
+        prefix: snapshot.fullText.slice(0, snapshot.start),
+        suffix: snapshot.fullText.slice(snapshot.end),
+      });
+      if (!check.valid) throw new Error(check.reason);
+    }
+    element.addEventListener("beforeinput", recordUserInput);
+    element.focus({ preventScroll: true });
+    if (!TypePilotEditor.isCurrent(snapshot)) throw new Error("The editor changed on focus. Use Copy result instead.");
+    performingInsertion = true;
+    if (mode === "native") {
+      const allowed = element.dispatchEvent(new InputEvent("beforeinput", {
+        bubbles: true, composed: true, cancelable: true, inputType: "insertReplacementText", data: replacement,
+      }));
+      if (!allowed || !TypePilotEditor.isCurrent(snapshot)) {
+        throw new Error("This editor blocked or changed the replacement. Use Copy result instead.");
+      }
+      setNativeFieldValue(element, nextText);
+      const cursor = snapshot.start + replacement.length;
+      element.setSelectionRange(cursor, cursor);
+      dispatchNativeInput(element, replacement);
+    } else {
+      const range = TypePilotEditor.range(snapshot);
+      if (!range) throw new Error("The selection is no longer valid. Use Copy result instead.");
       const selection = window.getSelection();
       selection.removeAllRanges();
-      selection.addRange(savedRange);
-
-      const beforeInput = new InputEvent("beforeinput", {
-        bubbles: true,
-        cancelable: true,
-        inputType: "insertText",
-        data: replacement,
-      });
-      if (activeElement && !activeElement.dispatchEvent(beforeInput)) return;
-
-      let inserted = false;
-      try {
-        inserted = document.execCommand("insertText", false, replacement);
-      } catch {
-        inserted = false;
+      selection.addRange(range);
+      const allowed = element.dispatchEvent(new InputEvent("beforeinput", {
+        bubbles: true, composed: true, cancelable: true, inputType: "insertText", data: replacement,
+      }));
+      if (!allowed || !TypePilotEditor.isCurrent(snapshot)) {
+        throw new Error("This editor blocked or changed the replacement. Use Copy result instead.");
       }
-
-      if (!inserted) {
-        savedRange.deleteContents();
-        const textNode = document.createTextNode(replacement);
-        savedRange.insertNode(textNode);
-        savedRange.setStartAfter(textNode);
-        savedRange.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(savedRange);
-
-        activeElement?.dispatchEvent(new InputEvent("input", {
-          bubbles: true,
-          inputType: "insertText",
-          data: replacement,
-        }));
+      // Browser-native insertion integrates with editor state. Do not force DOM mutations
+      // into a framework editor or undo an unrelated entry from its history.
+      const inserted = document.execCommand("insertText", false, replacement);
+      if (!inserted && TypePilotEditor.isCurrent(snapshot)) {
+        throw new Error("This editor does not support safe replacement. Use Copy result instead.");
       }
-    } catch (error) {
-      console.error("[TypePilot] Contenteditable replacement error:", error);
     }
+    performingInsertion = false;
+    const immediate = TypePilotEditor.read(element, mode);
+    if (immediate !== nextText) {
+      if (immediate !== snapshot.fullText) restoreOriginal(snapshot);
+      throw new Error("The editor rejected the complete replacement. The original is available in Recovery.");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    if (!element.isConnected) throw new Error("The editor was replaced by the page. The original is available in Recovery.");
+    const settled = TypePilotEditor.read(element, mode);
+    if (!userEdited && settled !== nextText) {
+      if (!settled || settled === replacement) restoreOriginal(snapshot);
+      throw new Error("The page rejected the replacement. The original is available in Recovery.");
+    }
+    removeAllUI({ cancelRequest: false });
+  } catch (error) {
+    showResultPopup(replacement, x, y, {
+      ...meta,
+      replacementError: error?.message || "Could not replace safely. Use Copy result instead.",
+    });
+  } finally {
+    snapshot?.element?.removeEventListener("beforeinput", recordUserInput);
+    isReplacingText = false;
   }
+}
 
-  removeAllUI({ cancelRequest: false });
+async function copyResult(text) {
+  isCopyingText = true;
+  try {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      const field = document.createElement("textarea");
+      field.value = text;
+      field.style.cssText = "position:fixed;left:-10000px;top:0";
+      document.body.appendChild(field);
+      field.select();
+      const success = document.execCommand("copy");
+      field.remove();
+      return success;
+    }
+  } finally {
+    isCopyingText = false;
+  }
 }
 
 function clampPopupToViewport(element, anchorY) {
@@ -578,6 +731,7 @@ function createPopupHeader(titleText, meta = null) {
     if (meta.usage?.responseTokens != null) rows.push(["Response tokens", meta.usage.responseTokens]);
     if (meta.usage?.totalTokens != null) rows.push(["Total tokens", meta.usage.totalTokens]);
     if (meta.durationMs != null) rows.push(["Response time", meta.cached ? "Instant cache" : `${(meta.durationMs / 1000).toFixed(2)} s`]);
+    if (meta.xWeightedLength != null) rows.push(["X length", `${meta.xWeightedLength}/280`]);
 
     for (const [label, value] of rows) {
       const row = document.createElement("div");
@@ -641,7 +795,9 @@ function showResultPopup(result, x, y, meta = {}) {
   resultButton.className = "typepilot-popup__item-text";
   resultButton.textContent = result;
   resultButton.title = "Replace the selected text";
-  resultButton.addEventListener("click", () => replaceSelectedText(result));
+  resultButton.addEventListener("click", () => {
+    void replaceSelectedText(result, meta);
+  });
 
   item.append(label, resultButton);
   list.appendChild(item);
@@ -650,7 +806,34 @@ function showResultPopup(result, x, y, meta = {}) {
   const hint = document.createElement("p");
   hint.className = "typepilot-popup__hint";
   hint.textContent = "Click the result to replace the selected text.";
+  hint.setAttribute("role", "status");
+  if (meta.replacementError) hint.textContent = meta.replacementError;
   popup.appendChild(hint);
+
+  const actions = document.createElement("div");
+  actions.className = "typepilot-popup__actions";
+  const copyButton = document.createElement("button");
+  copyButton.type = "button";
+  copyButton.className = "typepilot-popup__btn";
+  copyButton.textContent = "Copy result";
+  copyButton.addEventListener("click", async () => {
+    const copied = await copyResult(result);
+    hint.textContent = copied ? "Result copied. Paste it into your editor." : "Could not copy. Select the result text and copy it manually.";
+  });
+  actions.appendChild(copyButton);
+  if (meta.replacementError) {
+    const recoveryButton = document.createElement("button");
+    recoveryButton.type = "button";
+    recoveryButton.className = "typepilot-popup__btn";
+    recoveryButton.textContent = "Open Recovery";
+    recoveryButton.addEventListener("click", () => {
+      try {
+        if (chrome.runtime?.id) chrome.runtime.sendMessage({ type: "TYPEPILOT_OPEN_SETTINGS", section: "recovery" }).catch(() => {});
+      } catch { /* The page may need reloading after an extension update. */ }
+    });
+    actions.appendChild(recoveryButton);
+  }
+  popup.appendChild(actions);
 
   popup.style.left = `${x + window.scrollX + 8}px`;
   popup.style.top = `${y + window.scrollY + 8}px`;
@@ -692,20 +875,23 @@ function showErrorPopup(error, x, y, retryContext = null) {
     retryButton.addEventListener("click", () => {
       removePopup();
       showFloatingControl(x, y);
-      handleActionClick(retryContext.actionId, { x, y }, retryContext.text);
+      handleActionClick(retryContext.actionId, { x, y }, retryContext.text, retryContext.snapshot);
     });
     actions.appendChild(retryButton);
   }
 
-  if (["NO_KEY", "INVALID_KEY", "MODEL_NOT_FOUND", "QUOTA_EXCEEDED"].includes(code)) {
+  if (["NO_KEY", "INVALID_KEY", "MODEL_NOT_FOUND", "QUOTA_EXCEEDED", "REPLACEMENT_FAILED"].includes(code)) {
     const settingsButton = document.createElement("button");
     settingsButton.type = "button";
     settingsButton.className = "typepilot-popup__btn";
-    settingsButton.textContent = "Open Settings";
+    settingsButton.textContent = code === "REPLACEMENT_FAILED" ? "Open Recovery" : "Open Settings";
     settingsButton.addEventListener("click", () => {
       if (chrome.runtime?.id) {
         try {
-          chrome.runtime.sendMessage({ type: "TYPEPILOT_OPEN_SETTINGS" }).catch(() => {});
+          chrome.runtime.sendMessage({
+            type: "TYPEPILOT_OPEN_SETTINGS",
+            section: code === "REPLACEMENT_FAILED" ? "recovery" : "settings",
+          }).catch(() => {});
         } catch {
           // The page must be reloaded if the extension context is stale.
         }

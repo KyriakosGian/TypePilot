@@ -1,0 +1,27 @@
+name: Regression tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/regression.test.cjs
+      - run: node --check content.js && node --check options.js && node --check editor-state.js
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare isolated browser test tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/typepilot-tools" playwright@1.62.1
+          node "$RUNNER_TEMP/typepilot-tools/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Test unpacked extension
+        run: TYPEPILOT_PLAYWRIGHT="$RUNNER_TEMP/typepilot-tools/node_modules/playwright" node tests/browser.cjs

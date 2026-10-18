@@ -1,0 +1,2 @@
+# Preserve the upstream distribution's indentation without local whitespace lint.
+vendor/twitter-text.js -whitespace

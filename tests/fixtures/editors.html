@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>TypePilot editor regression fixture</title>
+<style>body{font:16px system-ui;margin:40px;max-width:800px}textarea,[contenteditable],input{display:block;width:600px;min-height:50px;margin:12px 0;padding:12px;border:1px solid #888}iframe{width:700px;height:180px}p{margin:0}#shadow{padding:12px}</style>
+</head><body>
+<h1>Neutral writing fixtures</h1>
+<label for="native">Standard message</label><textarea id="native">Before teh after.</textarea>
+<div id="rich" contenteditable="true" aria-label="Rich message"><p>Before <strong>teh</strong> after.</p><p>Second line.</p></div>
+<div id="plain" contenteditable="plaintext-only" aria-label="Plain message">Before teh after.</div>
+<input id="readonly" readonly value="Read only text">
+<div id="shadow"></div>
+<iframe title="Nested editor" src="/frame"></iframe>
+<script>
+const root=document.getElementById('shadow').attachShadow({mode:'open'});
+const field=document.createElement('textarea');field.id='shadow-native';field.value='Before teh after.';root.appendChild(field);
+</script></body></html>
