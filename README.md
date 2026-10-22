@@ -4,15 +4,18 @@
   <img src="https://img.shields.io/badge/version-1.4.1-6c63ff?style=flat-square" alt="Version 1.4.1"/>
   <img src="https://img.shields.io/badge/manifest-v3-blue?style=flat-square" alt="Manifest V3"/>
   <img src="https://img.shields.io/badge/powered%20by-Gemini-orange?style=flat-square" alt="Powered by Gemini"/>
+  <a href="https://chromewebstore.google.com/detail/typepilot/ggbcehbgoodblpdpjgglbhfnkmjmhdcm"><img src="https://img.shields.io/badge/Chrome_Web_Store-Available-4285f4?style=flat-square" alt="Available on the Chrome Web Store"/></a>
   <br/><br/>
   <a href="https://kyriakosgian.github.io/TypePilot/">Website</a> ·
-  <a href="https://github.com/KyriakosGian/TypePilot/releases/download/v1.4.1/TypePilot-v1.4.1.zip">Download v1.4.1</a> ·
+  <a href="https://chromewebstore.google.com/detail/typepilot/ggbcehbgoodblpdpjgglbhfnkmjmhdcm">Install from Chrome Web Store</a> ·
   <a href="https://github.com/KyriakosGian/TypePilot/releases">Releases</a>
 </div>
 
 TypePilot is a Chrome extension for correcting and improving work-related writing with Google Gemini and your own API key. Select text in a supported editable field, then fix spelling and grammar in one click or rewrite, translate, shorten, and adjust the tone.
 
 TypePilot uses your own Google Gemini API key and communicates directly from the browser to Google. There is no TypePilot backend or intermediate proxy.
+
+Version 1.4.1 is publicly available on the [Chrome Web Store](https://chromewebstore.google.com/detail/typepilot/ggbcehbgoodblpdpjgglbhfnkmjmhdcm) as of October 22, 2026.
 
 The extension is free. Google API access is separate and is not guaranteed to be free. Google's current terms require users to be 18 or older, professional or business use, and supported regions. API clients made available in the EEA, Switzerland, or the UK require Paid Services, meaning an API project with an active billing account under those terms. Check the [Gemini API terms](https://ai.google.dev/gemini-api/terms), [available regions](https://ai.google.dev/gemini-api/docs/available-regions), and [pricing](https://ai.google.dev/gemini-api/docs/pricing) for your project before use.
 
@@ -62,6 +65,26 @@ The extension is free. Google API access is separate and is not guaranteed to be
 
 ## Installation
 
+### Chrome Web Store (recommended)
+
+1. Open [TypePilot on the Chrome Web Store](https://chromewebstore.google.com/detail/typepilot/ggbcehbgoodblpdpjgglbhfnkmjmhdcm) in desktop Chrome.
+2. Select **Add to Chrome**, then confirm **Add extension** after reviewing the permissions.
+3. Pin TypePilot from Chrome's Extensions menu.
+4. Open TypePilot Settings and configure your own Gemini API key as described below.
+5. Refresh the website tabs where you want to use TypePilot.
+
+The Store installation does not require ZIP extraction or Developer mode.
+
+### Switching from an unpacked installation
+
+Copy any Recovery text you want to keep before disabling the unpacked copy.
+Keep your API key and preferred settings available privately, then disable the
+unpacked TypePilot in `chrome://extensions/`. Install the Store version and
+configure its Settings again. Do not assume settings transfer between the two
+installations, and avoid running both copies on the same pages.
+
+### Manual installation (developers)
+
 1. Download the latest [TypePilot release](https://github.com/KyriakosGian/TypePilot/releases/latest).
 2. Extract the downloaded ZIP file.
 3. Open `chrome://extensions/` in Chrome.
@@ -105,6 +128,7 @@ The extension remains plain JavaScript and CSS with no runtime build or dependen
 - Run `node scripts/check-store.cjs` for read-only Store listing, image, package-content, and checksum checks.
 - Run `node tests/browser.cjs` with Playwright and its Chromium available for real unpacked-extension editor tests. `TYPEPILOT_PLAYWRIGHT` can point to an existing Playwright package and `PLAYWRIGHT_BROWSERS_PATH` to its browser cache.
 - Set `TYPEPILOT_CAPTURE=1` when running the browser suite to regenerate the five neutral store screenshots after the checks pass.
+- Set `TYPEPILOT_CAPTURE_LANDING=1` to capture only desktop/mobile homepage previews without changing Store screenshots.
 - GitHub Actions runs both the regression suite and Chromium editor checks on pushes and pull requests.
 - Run `powershell -File scripts/package.ps1` on Windows (or `pwsh -File scripts/package.ps1`) to regenerate the extension-only ZIP and checksums.
 
@@ -118,14 +142,20 @@ Selected text and relevant writing settings are sent directly to Google for a us
 
 Read the full [TypePilot Privacy Policy](PRIVACY.md).
 
-## Chrome Web Store Preparation
+## Chrome Web Store and Future Updates
 
+TypePilot 1.4.1 is [published publicly on the Chrome Web Store](https://chromewebstore.google.com/detail/typepilot/ggbcehbgoodblpdpjgglbhfnkmjmhdcm).
 The English [listing text](store-assets/STORE-LISTING.md) and
 [submission guide](store-assets/SUBMISSION.md) cover descriptions, images,
 permission justifications, data disclosures, and private reviewer instructions.
-The guide records the remaining manual checks and Google API eligibility
-conditions. Prepared files do not mean the extension has been submitted or
-approved by the Chrome Web Store.
+They remain reference material for future submissions, not a substitute for
+checking the live Store status or Google's current requirements.
+
+Future runtime changes require a higher version, a new tested package, and an
+update submitted to the same Store item. A GitHub push or GitHub release alone
+does not update the Store version. Support and bug reports belong in
+[GitHub Issues](https://github.com/KyriakosGian/TypePilot/issues), without API
+keys or private draft text.
 
 ## Credits
 

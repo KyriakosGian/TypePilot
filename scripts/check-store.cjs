@@ -76,6 +76,7 @@ const manifest = JSON.parse(text('manifest.json'));
 const listing = text('store-assets/STORE-LISTING.md').replaceAll('\r\n', '\n');
 const submission = text('store-assets/SUBMISSION.md');
 const packageName = `TypePilot-v${manifest.version}.zip`;
+const storeUrl = 'https://chromewebstore.google.com/detail/typepilot/ggbcehbgoodblpdpjgglbhfnkmjmhdcm';
 const runtime = ['background.js', 'content.js', 'editor-state.js', 'x-post.js', 'manifest.json',
   'options.html', 'options.js', 'options.css', 'style.css', 'LICENSE', 'PRIVACY.md',
   ...[16, 32, 48, 128].map(size => `icons/icon${size}.png`),
@@ -91,6 +92,21 @@ check('manifest metadata and prepared listing agree', () => {
   assert.ok(submission.includes(`Version: ${manifest.version}`));
   assert.ok(block(listing, 'Detailed description').startsWith('TypePilot is a Chrome extension'));
   assert.ok(block(listing, 'Detailed description').length <= 16000);
+  const reviewerCopy = submission.split('provided in its private password field:')[1]?.match(/```text\r?\n([\s\S]*?)\r?\n```/)?.[1];
+  assert.ok(reviewerCopy && reviewerCopy.length <= 500, 'Reviewer copy exceeds the dashboard limit');
+});
+check('public installation routes point to the published Store item', () => {
+  for (const name of ['README.md', 'index.html', 'AGENTS.md', 'store-assets/README.md', 'store-assets/AUDIT.md', 'store-assets/STORE-LISTING.md', 'store-assets/SUBMISSION.md']) {
+    assert.ok(text(name).includes(storeUrl), `${name}: missing published Store link`);
+  }
+  const html = text('index.html');
+  const structured = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+  assert.equal(structured.installUrl, storeUrl);
+  assert.ok(html.includes(`href="${storeUrl}">Add to Chrome</a>`));
+  assert.ok(html.includes(`href="${storeUrl}">Install from Chrome Web Store</a>`));
+  assert.ok(text('README.md').includes('### Chrome Web Store (recommended)'));
+  assert.ok(text('README.md').includes('### Switching from an unpacked installation'));
+  assert.ok(text('README.md').includes('### Manual installation (developers)'));
 });
 check('permission justifications match the package', () => {
   assert.deepEqual(manifest.permissions, ['storage']);
@@ -162,6 +178,8 @@ async function onlineChecks() {
       const value = bytes.toString();
       assert.ok(value.includes(`"softwareVersion": "${manifest.version}"`));
       assert.ok(value.includes('Paid Services') && !value.includes('Google Gemini Free'));
+      assert.ok(value.includes(`"installUrl": "${storeUrl}"`));
+      assert.ok(value.includes(`href="${storeUrl}">Add to Chrome</a>`));
     }],
     ['public demo editor', `${base}store-assets/demo-page.html`, bytes => {
       assert.ok(bytes.toString().includes('contenteditable="true"'));
@@ -175,6 +193,17 @@ async function onlineChecks() {
       const about = JSON.parse(bytes).description;
       assert.ok(about.includes('your own API key') && !about.includes('Google Gemini Free'));
       assert.ok(about.includes('separate Google API costs'));
+      assert.ok(about.includes('Chrome Web Store'));
+    }],
+    ['published Chrome Web Store listing', storeUrl, bytes => {
+      const value = bytes.toString();
+      assert.ok(/<title>TypePilot - Chrome Web Store<\/title>/.test(value));
+      assert.ok(value.includes(manifest.version), 'Store does not show the current version');
+    }],
+    ['published release includes Store installation link', `https://api.github.com/repos/KyriakosGian/TypePilot/releases/tags/v${manifest.version}`, bytes => {
+      const release = JSON.parse(bytes);
+      assert.equal(release.draft, false);
+      assert.ok(release.body.includes(storeUrl));
     }],
     ['published ZIP checksum', `${repo}/releases/download/v${manifest.version}/${packageName}`, bytes => {
       assert.equal(sha256(bytes), sha256(read(`release/${packageName}`)));
@@ -192,6 +221,6 @@ async function onlineChecks() {
 (async () => {
   if (process.argv.includes('--online')) await onlineChecks();
   console.log(`${passed} store-material checks passed, ${failed} failed.`);
-  console.log('These checks do not approve the listing, verify live Gemini access, or clear the manual submission gates.');
+  console.log('These checks do not verify live Gemini access or replace manual review for future submissions.');
   if (failed) process.exitCode = 1;
 })().catch(error => { console.error(error.message); process.exitCode = 1; });

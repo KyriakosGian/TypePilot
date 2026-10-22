@@ -12,6 +12,12 @@ TypePilot is a Chrome Extension using Manifest V3. It is a real-time AI writing 
 
 Current version: 1.4.1
 
+Public Chrome Web Store version: 1.4.1, published October 22, 2026.
+Listing: https://chromewebstore.google.com/detail/typepilot/ggbcehbgoodblpdpjgglbhfnkmjmhdcm
+Use the Store as the primary public installation route. Keep unpacked/ZIP
+instructions for development. Documentation-only changes do not require a new
+runtime package. Never overwrite already published release ZIPs.
+
 ## Development
 
 There is no runtime build or dependency installation. Load this directory as an unpacked extension from `chrome://extensions/`. Reload the extension and any existing test tab after changes. Run `node --test tests/regression.test.cjs` for dependency-free regression checks. `tests/browser.cjs` uses an existing Playwright/Chromium installation with a temporary profile and mocked Gemini responses.

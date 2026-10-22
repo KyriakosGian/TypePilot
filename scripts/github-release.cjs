@@ -1,4 +1,4 @@
-/* Publish a tested package using Git's configured GitHub credential helper.
+/* Publish a tested package or sync public metadata using Git's configured GitHub credential helper.
  * Credentials stay in memory and are never printed or written to the repository. */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -12,6 +12,9 @@ const remote = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: root,
 const match = remote.match(/^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?$/);
 if (!match) throw new Error('Expected the configured GitHub HTTPS origin.');
 const repository = `${match[1]}/${match[2]}`;
+const storeUrl = 'https://chromewebstore.google.com/detail/typepilot/ggbcehbgoodblpdpjgglbhfnkmjmhdcm';
+const storeNotice = `Install the public extension from the [Chrome Web Store](${storeUrl}). The ZIP below remains available for manual developer installation.`;
+const description = 'Chrome extension available on the Chrome Web Store. Fix, rewrite, translate, shorten, adjust tone, and prepare X posts with Google Gemini and your own API key. Includes Recovery and Copy result. Free extension, separate Google API costs and eligibility.';
 const gitEnvironment = { ...process.env, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'Never' };
 const credentialOutput = execFileSync('git', ['credential', 'fill'], {
   cwd: root, input: 'protocol=https\nhost=github.com\n\n', encoding: 'utf8',
@@ -33,10 +36,10 @@ async function api(route, method = 'GET', body) {
     const repo = await api('');
     const release = await api(`/releases/tags/${tag}`);
     const runs = await api('/actions/runs?per_page=5');
-    console.log(JSON.stringify({ repository: repo.full_name, description: repo.description, release: release?.html_url || null, assets: release?.assets?.map(asset => asset.name) || [], runs: runs.workflow_runs?.map(run => ({ name: run.name, sha: run.head_sha.slice(0, 7), status: run.status, conclusion: run.conclusion, url: run.html_url })) }, null, 2));
+    console.log(JSON.stringify({ repository: repo.full_name, description: repo.description, homepage: repo.homepage, release: release?.html_url || null, storeLinkInRelease: release?.body?.includes(storeUrl) || false, assets: release?.assets?.map(asset => ({ name: asset.name, digest: asset.digest })) || [], runs: runs.workflow_runs?.map(run => ({ name: run.name, sha: run.head_sha.slice(0, 7), status: run.status, conclusion: run.conclusion, url: run.html_url })) }, null, 2));
     return;
   }
-  if (mode !== 'publish') throw new Error('Use status or publish.');
+  if (!['publish', 'sync-metadata'].includes(mode)) throw new Error('Use status, publish, or sync-metadata.');
   if (execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim()) throw new Error('Commit the exact tested source and package before publishing.');
   const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
   const upstream = execFileSync('git', ['rev-parse', 'origin/main'], { cwd: root, encoding: 'utf8' }).trim();
@@ -46,11 +49,22 @@ async function api(route, method = 'GET', body) {
   if (regression?.status !== 'completed' || regression.conclusion !== 'success') {
     throw new Error('Wait for both GitHub regression and browser jobs to pass before publishing.');
   }
+  if (mode === 'sync-metadata') {
+    const release = await api(`/releases/tags/${tag}`);
+    if (!release || release.draft) throw new Error('Metadata sync requires the existing public release.');
+    if (!release.body?.includes(storeUrl)) {
+      await api(`/releases/${release.id}`, 'PATCH', { body: `${storeNotice}\n\n${release.body || ''}` });
+    }
+    await api('', 'PATCH', { description, homepage: `https://${match[1].toLowerCase()}.github.io/${match[2]}/` });
+    console.log(JSON.stringify({ repository: `https://github.com/${repository}`, release: release.html_url, store: storeUrl, assetsUnchanged: true }, null, 2));
+    return;
+  }
   const changelog = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
   const heading = `## [${manifest.version}]`;
   const section = changelog.slice(changelog.indexOf(heading));
-  const body = section.split(/\r?\n/).slice(2).join('\n').split(/\n## \[/)[0].trim();
-  if (!body) throw new Error('The release changelog is missing.');
+  const notes = section.split(/\r?\n/).slice(2).join('\n').split(/\n## \[/)[0].trim();
+  if (!notes) throw new Error('The release changelog is missing.');
+  const body = `${storeNotice}\n\n${notes}`;
   let release = await api(`/releases/tags/${tag}`);
   if (release && !release.draft) throw new Error('This release is already public. Refusing to replace its assets.');
   if (!release) release = await api('/releases', 'POST', { tag_name: tag, target_commitish: head, name: `TypePilot ${tag}`, body, draft: true, prerelease: false });
@@ -68,6 +82,6 @@ async function api(route, method = 'GET', body) {
     if (!response.ok) throw new Error(`GitHub upload of ${filename} returned HTTP ${response.status}. The release remains a draft.`);
   }
   release = await api(`/releases/${release.id}`, 'PATCH', { draft: false, body, make_latest: 'true' });
-  await api('', 'PATCH', { description: 'Chrome extension for work-related writing with Google Gemini and your own API key. Fix, rewrite, translate, shorten, adjust tone, and prepare X posts. Includes Recovery and Copy result. Free extension, separate Google API costs and eligibility.', homepage: `https://${match[1].toLowerCase()}.github.io/${match[2]}/` });
+  await api('', 'PATCH', { description, homepage: `https://${match[1].toLowerCase()}.github.io/${match[2]}/` });
   console.log(JSON.stringify({ release: release.html_url, tag, repository: `https://github.com/${repository}` }, null, 2));
 })().catch(error => { console.error(error.message); process.exitCode = 1; });

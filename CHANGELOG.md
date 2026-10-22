@@ -2,6 +2,13 @@
 
 All notable changes to TypePilot are documented here.
 
+## [Documentation] - 2026-10-22
+
+- TypePilot 1.4.1 was published publicly on the [Chrome Web Store](https://chromewebstore.google.com/detail/typepilot/ggbcehbgoodblpdpjgglbhfnkmjmhdcm).
+- Made the Store the primary installation route in README, project-page buttons, structured metadata, and GitHub release information. ZIP installation remains available for developers.
+- Added migration instructions for existing unpacked installations and clarified how future Store updates differ from GitHub pushes/releases.
+- Updated publication records and checks without changing the extension version, permissions, runtime code, or published ZIP.
+
 ## [1.4.1] - 2026-10-18
 
 ### Documentation and Checks

@@ -246,6 +246,14 @@ async function run(name, fn) {
           await page.goto(`http://127.0.0.1:${server.address().port}/index.html`);
           assert.equal(await page.locator('.hero-api-note').isVisible(), true);
           assert.match(await page.locator('.hero-api-note').innerText(), /Paid Services/);
+          const storeUrl = 'https://chromewebstore.google.com/detail/typepilot/ggbcehbgoodblpdpjgglbhfnkmjmhdcm';
+          assert.equal(await page.getByRole('link', { name: 'Add to Chrome', exact: true }).getAttribute('href'), storeUrl);
+          const install = page.getByRole('link', { name: 'Install from Chrome Web Store', exact: true });
+          assert.equal(await install.getAttribute('href'), storeUrl);
+          await install.scrollIntoViewIfNeeded();
+          const bounds = await install.boundingBox();
+          assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= viewport.width + 1, 'Store button overflows viewport');
+          assert.match(await page.getByRole('link', { name: 'Developer ZIP v1.4.1', exact: true }).getAttribute('href'), /\/releases\/download\/v1\.4\.1\/TypePilot-v1\.4\.1\.zip$/);
           const layout = await page.evaluate(() => ({ width: innerWidth, content: document.documentElement.scrollWidth }));
           assert.ok(layout.content <= layout.width + 1, `Horizontal overflow at ${viewport.width}px`);
           for (const picture of await page.locator('img[src*="screenshots/"]').all()) {
@@ -257,10 +265,12 @@ async function run(name, fn) {
             });
             assert.ok(shape.fit !== 'fill' || Math.abs(shape.width / shape.height - shape.natural) < 0.02, 'Stretched screenshot');
           }
-          if (process.env.TYPEPILOT_CAPTURE === '1') {
+          if (process.env.TYPEPILOT_CAPTURE === '1' || process.env.TYPEPILOT_CAPTURE_LANDING === '1') {
             fs.mkdirSync(artifacts, { recursive: true });
             await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
             await page.screenshot({ animations: 'disabled', path: path.join(artifacts, `landing-${viewport.width}.png`) });
+            await page.locator('#install').scrollIntoViewIfNeeded();
+            await page.screenshot({ animations: 'disabled', path: path.join(artifacts, `install-${viewport.width}.png`) });
           }
         }
       } finally { await page.setViewportSize({ width: 1280, height: 800 }); }

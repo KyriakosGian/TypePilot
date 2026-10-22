@@ -2,8 +2,11 @@
 
 Version: 1.4.1. Prepared on October 18, 2026.
 
-This is a preparation guide, not a record of a Chrome Web Store submission or
-approval. The account owner supplies private account details only inside
+Publication update, October 22, 2026: version 1.4.1 was published with Public
+visibility on the [Chrome Web Store](https://chromewebstore.google.com/detail/typepilot/ggbcehbgoodblpdpjgglbhfnkmjmhdcm).
+Use this guide as a reference for future updates to that same Store item, not
+as a reason to create a duplicate listing. Recheck the checklist for each new
+submission. The account owner supplies private account details only inside
 Google's dashboard. Never put credentials, addresses, or other private account
 data in this public repository, screenshots, issues, or release assets.
 
@@ -119,15 +122,28 @@ prompts. Google's separate terms vary by plan and region.
 
 ## 6. Private test instructions for Google reviewers
 
+The first submission's review completed with publication on October 22, 2026.
+Revoke any temporary reviewer key privately if it is no longer needed. For a
+future submission, decide whether to provide a separate review key and test it
+before sharing it. The Store's private Additional instructions field currently
+allows 500 characters. Use this short copy only when a working key is actually
+provided in its private password field:
+
+```text
+No TypePilot login. The password field contains a Gemini API key for review. Paste it into TypePilot Settings, choose an available model and save. Open https://kyriakosgian.github.io/TypePilot/store-assets/demo-page.html, select text and click Fix. Apply the result or use Copy result. Test the other menu actions, change the translation language in Settings, and check Recovery after replacement. Chrome system pages are unsupported.
+```
+
 No TypePilot login is required. A working Gemini API key is required to obtain
 real suggestions. If reviewer credentials are needed, the account owner must
 provide a separate, limited review key only in the private Test instructions
 tab. Never include a personal production key or a key in the public listing,
 repository, screenshots, or support issues. Verify the review key's API
 restrictions, model access, billing requirements, and quota before submission.
-Revoke it after review. No review key has been created or stored here.
+Revoke it after review if it is no longer needed. No review key is stored in
+this repository.
 
-Copy these non-secret instructions into the private test-instructions field:
+The following longer procedure is a reference for the reviewer steps, not text
+to paste into the 500-character field:
 
 ```text
 TypePilot 1.4.1 uses a Bring Your Own Key connection to Google Gemini. There is no TypePilot account or login. Use a working Gemini API key supplied through the private reviewer credentials field, or a reviewer's own eligible key. No key is embedded in the extension.
@@ -163,7 +179,10 @@ that the service and intended audience comply with Google's applicable terms.
 If distribution scope or the product's consumer/professional positioning needs
 to change, resolve that choice before submission, not after publication.
 
-## 8. Final checklist
+## 8. Checklist for each future submission
+
+The initial 1.4.1 submission is complete and public. Recheck these items for
+future updates. Unchecked items are not a statement that publication is pending.
 
 - [x] Source README, website, privacy policy, listing, Settings, and the GitHub About release configuration distinguish the free extension from Google API costs and eligibility. Verify the deployed copies again before submitting.
 - [x] The privacy policy describes independent Settings model-discovery requests and actual cache retention. Version 1.4.1 uses a new package, leaving the public 1.4.0 asset unchanged. See [AUDIT.md](AUDIT.md).

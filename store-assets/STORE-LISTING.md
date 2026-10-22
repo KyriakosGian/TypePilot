@@ -4,6 +4,13 @@ Prepared for version 1.4.1. Copy only the text inside the relevant blocks into
 the dashboard. This English listing matches the extension's English interface.
 The 25 translation targets are writing features, not 25 localized interfaces.
 
+## Published listing
+
+Version 1.4.1 was published with Public visibility on October 22, 2026:
+[TypePilot on the Chrome Web Store](https://chromewebstore.google.com/detail/typepilot/ggbcehbgoodblpdpjgglbhfnkmjmhdcm).
+The description below is the reference copy for future maintenance. This
+publication update does not change the Store package or its description.
+
 ## Name
 
 The package supplies this field through `manifest.json`.

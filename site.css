@@ -816,6 +816,12 @@ img {
   flex: 0 0 auto;
 }
 
+.install-actions .text-link {
+  justify-content: center;
+  margin-top: 4px;
+  color: white;
+}
+
 .button-light {
   background: white;
   color: #171934;
